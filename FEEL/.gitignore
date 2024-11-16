@@ -1,0 +1,5 @@
+outs/
+data/kinetics/k400
+data/kinetics/k400_targz
+data/kinetics/wget_log
+weights/
