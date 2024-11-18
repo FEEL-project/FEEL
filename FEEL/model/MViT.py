@@ -29,6 +29,7 @@ class my_MViT(nn.Module):
         x: [B, C, T, H, W] (C=3, T=16, H=224, W=224)
         characteristics1: [B, T*H*W, embed_dim] (T=16, H=224, W=224, embed_dim=96)
         """
+        
         x = _unsqueeze(x, 5, 2)[0]
         # patchify and reshape: (B, C, T, H, W) -> (B, embed_channels[0], T', H', W') -> (B, THW', embed_channels[0])
         x = self.base_model.conv_proj(x)
