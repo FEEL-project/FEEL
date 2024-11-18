@@ -28,6 +28,7 @@ class Hippocampus():
 		self.minimal_events = 100 # replayが可能な最低限のevent数
 		self.max_events = 1000 # memoryに格納可能な最大event数
 		self.replay_iteration = 5 # 一度のreplayで生成するepisodeの数
+		self.size_episode = 3 # 生成するepisodeの長さ
 		
 		# memory(ベクトルデータベース), 類似度検索用
 		nlist = 100 # FAISSインデックスのクラスタ数
