@@ -10,7 +10,7 @@ class VideoDataset(Dataset):
         # 動画ファイルパスのリスト
         self.paths = paths
         # 正解ラベルのリストをテンソルに変換
-        self.labels = [int(label) for label in labels]
+        self.labels = labels
         self.labels = torch.tensor(self.labels)
         # サンプリングするフレームクリップ数
         self.clip_length = clip_length
@@ -66,8 +66,7 @@ def load_video_dataset(video_dir: str, batch_size: int, clip_length: int)->DataL
     labels = []
     for video_file in video_dir_path.glob('*.mp4'):
         file_name = video_file.stem
-        label_id = file_name[:2]  # ファイル名の先頭2文字をラベルとする
-
+        label_id = (int(file_name.split('_')[0]) - 10.0)/10.0  # ファイル名の先頭2文字をラベルとする
         full_path = os.path.join(video_dir, video_file.name)
         paths.append(full_path)
         labels.append(label_id)
