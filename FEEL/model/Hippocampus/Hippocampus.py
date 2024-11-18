@@ -3,7 +3,10 @@ from queue import PriorityQueue	# MinHeap (heapq is not thread-safe)
 import faiss
 import torch
 import torch.nn as nn
+from torch.utils.data import WeightedRandomSampler, DataLoader
 from .Database import VectorDatabase
+from .EventDataset import EventDataset
+from .Episode import Episode
 
 class Hippocampus():
 	"""海馬: カスタムデータローダー的な位置付け
@@ -13,7 +16,7 @@ class Hippocampus():
 	2. 新規eventについて、関連性の高いeventを検索し、それらを加味したepisodeを生成する
 	3. memory内のeventを、計算された重みで決まる確率に従ってreplayする
 	"""
-	def __init__(self, dimension):
+	def __init__(self, dimension, ):
 		# hyper-parameters
 		self.cnt_events = 0 # 現在までの総event数
 		self.num_events = 0 # 現在memoryに存在するeventの数
@@ -23,11 +26,11 @@ class Hippocampus():
 		self.minimal_events = 100 # replayが可能な最低限のevent数
 		self.max_events = 1000 # memoryに格納可能な最大event数
 		self.replay_iteration = 5 # 一度のreplayで生成するepisodeの数
-		self.size_episode = 3 # 各episodeを構成するeventの数
 		
 		# memory(ベクトルデータベース), 類似度検索用
 		nlist = 100 # FAISSインデックスのクラスタ数
 		self.STM = VectorDatabase(dimension, index_type="IVF", nlist=40) # memory本体(Short-Term-Memory)
+		self.event_dataset = EventDataset([], [], []) # memoryのデータセット
 		
 		# relevant dictionary
 		self.id_to_memory = {} # key:id, value:(characteristics, evaluation)
@@ -38,7 +41,9 @@ class Hippocampus():
 		self.priority = PriorityQueue() # priorityによる優先度つきのeventキュー(MinHeap)
 		
 		# generator
-		self.replay_generator = WeightedRandomSampler()
+		self.replay_generator = None
+		self.DataLoader = None
+		self.batch_size = 1
 		
 	def calc_priority(self, event_id, evaluation):
 		"""
@@ -49,8 +54,14 @@ class Hippocampus():
 		"""
 		一つサンプルを生成する
 		"""
-		weights = torch.tensor(self.list_priority)
-		return iter(torch.multinomial(weights, ))
+		if self.num_events <= self.minimal_events:
+			return None
+		if self.replay_generator == None or self.num_replay % self.loss_interval == 0:
+			# 一定の頻度でsamplerに使うweightsを更新する
+			weights = torch.tensor(self.list_priority)
+			self.replay_generator = WeightedRandomSampler(weights, self.replay_iteration)
+			self.DataLoader = DataLoader(self.event_dataset, sampler=self.replay_generator, batch_size=1)
+		return next(iter(self.DataLoader))
 	
 	def get_characteristics(self, event_id):
 		"""
@@ -91,11 +102,12 @@ class Hippocampus():
 		2. 必要に応じて、weightが小さすぎるサンプルを削除する
 		"""
 		# eventのサンプリング
-		
+		event = self.__iter__()
 		# 更新・不要サンプルの削除
 		self.num_replay += 1
 		if self.num_replay % self.loss_interval == 0:
 			self.memory_loss()
+		return event
 		
 	def generate_episode(self, event_id=-1, characteristics=None):
 		"""
