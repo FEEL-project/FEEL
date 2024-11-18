@@ -8,6 +8,16 @@
     これにより、`model/`以下のディレクトリ構成が変わっても、`model`外部からインターフェースを変えることなくアクセスできるようになる。
 
 ## Model Class
-### ECO
+**FEEL (Feedback Emotion ELaborator)**
+### MViT
 
-### 
+### Hippocampus
+
+### Subcortical Pathway
+
+### Prefrontal Cortex
+
+### Amygdala
+
+### ECO (Legacy)
+
