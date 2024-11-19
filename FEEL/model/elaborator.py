@@ -1,8 +1,10 @@
 import torch
 import torch.nn as nn
-from model import EnhancedMViT, Amygdala, PrefrontalCortex
-from model.Hippocampus.Hippocampus import Hippocampus
-from model.Controller import EvalController
+from .mvit import EnhancedMViT
+from .amygdala import Amygdala
+from .prefrontal_cortex import PFC
+from .hippocampus import Hippocampus
+from .controller import EvalController
 
 class Elaborator(nn.Module):
     def __init__(self):
@@ -10,7 +12,7 @@ class Elaborator(nn.Module):
         self.sensory_cortex = EnhancedMViT()
         self.hippocampus = Hippocampus()
         self.amygdala = Amygdala()
-        self.prefrontal_cortex = PrefrontalCortex()
+        self.prefrontal_cortex = PFC()
         self.controller = EvalController()
     def __meditation__(self):
         self.amygdala.meditation = True
