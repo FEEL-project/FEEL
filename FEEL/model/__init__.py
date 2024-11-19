@@ -6,5 +6,7 @@ from .hippocampus import Hippocampus, VectorDatabase, EventDataset, Episode
 from .controller import EvalController
 from .amygdala import Amygdala
 from .prefrontal_cortex import PFC
+from .elaborator import Elaborator
+from .subcortical_pathway import SubcorticalPathway
 
 __all__ = ['ECO_Lite', 'Full_ECO', 'EnhancedMViT', 'Hippocampus', 'VectorDatabase', 'EventDataset', 'Episode', 'EvalController', 'Amygdala', 'PFC']

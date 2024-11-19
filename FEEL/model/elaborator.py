@@ -5,6 +5,7 @@ from .amygdala import Amygdala
 from .prefrontal_cortex import PFC
 from .hippocampus import Hippocampus
 from .controller import EvalController
+from .subcortical_pathway import SubcorticalPathway
 
 class Elaborator(nn.Module):
     def __init__(self):
@@ -12,6 +13,7 @@ class Elaborator(nn.Module):
         self.sensory_cortex = EnhancedMViT()
         self.hippocampus = Hippocampus()
         self.amygdala = Amygdala()
+        self.subcortical_pathway = SubcorticalPathway()
         self.prefrontal_cortex = PFC()
         self.controller = EvalController()
     def __meditation__(self):
@@ -25,6 +27,7 @@ class Elaborator(nn.Module):
         return x
 
     #全体ぐるぐる
+    #感情ベクトルを正解に近づける
     #optimizerは二つのモデルに共通
     def train_loop(self, optimizer):
         self.prefrontal_cortex.train()
@@ -55,6 +58,8 @@ class Elaborator(nn.Module):
                 total_loss += loss.item()
         print(f"Test Error: \n Avg loss: {total_loss/self.hippocampus.num_events:>8f} \n")
     
+    #前頭前野を支配的にする
+    #optimizerはcontrollerのみ
     def train2(self, optimizer):
         self.prefrontal_cortex.eval()
         self.controller.train()
