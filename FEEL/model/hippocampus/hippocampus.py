@@ -22,18 +22,19 @@ class Hippocampus():
 		self.num_events = 0 # 現在memoryに存在するeventの数
 		self.num_replay = 0 # これまでの総replay数
 		# memory-loss
-		self.loss = True	# .no_loss()でFalse, .loss()でTrueに変更
-		self.loss_interval = 10 # データセットからサンプルの削除頻度
-		self.loss_rate = 0.1 # データセットから削除する割合
-		self.minimal_events = 100 # replayが可能な最低限のevent数
-		self.max_events = 1000 # memoryに格納可能な最大event数
-		self.replay_iteration = 5 # 一度のreplayで生成するepisodeの数
-		self.size_episode = 3 # 生成するepisodeの長さ
+		self.minimal_to_loss = 100 	# memory-lossが発生する最小のevent数
+		self.loss = True			# .no_loss()でFalse, .loss()でTrueに変更
+		self.loss_interval = 10 	# データセットからサンプルの削除頻度
+		self.loss_rate = 0.1 		# データセットから削除する割合
+		self.minimal_events = 100 	# replayが可能な最低限のevent数
+		self.max_events = 1000 		# memoryに格納可能な最大event数
+		self.replay_iteration = 5 	# 一度のreplayで生成するepisodeの数
+		self.size_episode = 3 		# 生成するepisodeの長さ
 		
 		# memory(ベクトルデータベース), 類似度検索用
 		nlist = 100 # FAISSインデックスのクラスタ数
 		self.STM = VectorDatabase(dimension, index_type="IVF", nlist=40) # memory本体(Short-Term-Memory)
-		self.event_dataset = EventDataset([], [], []) # memoryのデータセット, get_by_id()でアクセス可能
+		self.event_dataset = EventDataset() # memoryのデータセット, get_by_id()でアクセス可能
 		
 		# relevant dictionary
 		self.id_to_priority = {} # key:id, value:priority
@@ -87,7 +88,7 @@ class Hippocampus():
 			if event_id == -1:
 				raise ValueError("Neither event_id nor characteristics is given.")
 			characteristics = self.event_dataset.get_by_id(event_id)['characteristics']	# 要変更
-		return self.STM.search(characteristics, k)
+		return self.STM.search(characteristics, k)	# 要変更
 		
 	def memory_loss(self):
 		"""
@@ -113,31 +114,30 @@ class Hippocampus():
 		"""
 		# eventのサンプリング
 		event = self.sample(batch_size)
-		# priorityの更新
+		# priorityの更新: 要検討(アルゴリズム)
 		ids = event['id']
 		for i in range(len(ids)):
 			self.id_to_priority[event['id']] += np.abs(self.get_event(event['id'])['evaluation'].numpy())
-   
 		# 更新・不要サンプルの削除
 		self.num_replay += batch_size
-		if self.num_replay % self.loss_interval == 0:
+		if self.loss and self.num_replay % self.loss_interval == 0:
 			self.memory_loss()
 		return event
 		
-	def generate_episode(self, event_id=-1, characteristics=None):
+	def generate_episode(self, event=None):
 		"""
 		eventから過去の類似eventを検索して、episodeを1つ生成する
 		event==None(新たなeventが発生していないとき):
 			event = replay()
 		"""
-		if event_id == -1 and characteristics == None:
-			event_id, characteristics = self.replay()
-		id_list = self.search(k=self.size_episode, 
-											event_id=event_id, 
-											characteristics=characteristics)
-		episode = []
-		for i in range(len(id_list)):
-			episode.append(self.get_event(id_list[i]))
+		if event == None:
+			return
+		event_id = event['id']
+		id_list = self.search(k=self.size_episode-1, 
+											characteristics=event['characteristics'])
+		episode = [event]
+		for i in range(self.size_episode-1):
+			episode.append(self.get_event(id_list[i]))	# nucleur event
 		return episode
 		
 	def receive(self, event_id, characteristics, evaluation):
@@ -153,11 +153,13 @@ class Hippocampus():
 		self.STM.add(event_id, characteristics)
 		priority = self.calc_priority(event_id, evaluation)
 		self.priority.put((event_id, priority))
+  
+		event = self.get_event(event_id)
 		
 		# episode生成
 		if self.num_events > self.minimal_events:
 			# 一定数のeventがmemoryにある場合、関連eventを検索してepisode生成する
-			episode = self.generate_episode(event_id, characteristics)
+			episode = self.generate_episode(event)
 			return episode # torch.tensor
 		else:
 			return None
