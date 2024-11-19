@@ -32,6 +32,10 @@ class EventDataset(Dataset):
         self._id_to_index = {id_val: idx for idx, id_val in enumerate(self.ids)}
 
     def get_by_id(self, id_value):
+        # {'id': self.ids[idx], 
+        #  'data': torch.from_numpy(self.data[idx]).float(), 
+        #  'evaluation': torch.from_numpy(self.evaluations[idx]).float()
+        # }
         index = self._id_to_index.get(id_value)
         return self[index] if index is not None else None
 
