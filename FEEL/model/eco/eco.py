@@ -5,8 +5,8 @@ Efficient Convolutional Network for Online Video Understanding Model
 """
 import torch
 import torch.nn as nn
-
-from ECO import ECO_2D, ECO_3D
+from .cnn_3d import ECO_3D
+from .inception_v2 import ECO_2D
 
 class ECO_Lite(nn.Module):
     """ECO_Lite"""

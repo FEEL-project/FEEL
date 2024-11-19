@@ -1,2 +1,5 @@
 FEEL/dataset/Miniconda3-latest-Linux-x86_64.sh
 FEEL/data/kinetics-dataset/wget-log
+
+.venv
+batch.sh
