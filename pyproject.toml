@@ -1,0 +1,23 @@
+[tool.poetry]
+name = "ai-exp-learning"
+version = "0.1.0"
+description = ""
+authors = ["Your Name <you@example.com>"]
+readme = "README.md"
+
+[tool.poetry.dependencies]
+python = "~3.10"
+gym = "0.22.0"
+pyworld = "^0.3.4"
+pysptk = "^1.0.1"
+dt = "^1.1.65"
+pyyaml = "^6.0.2"
+numpy = "1.26.0"
+torchvision = "0.14.1"
+pygame = "^2.6.1"
+faiss-gpu = "^1.7.2"
+
+
+[build-system]
+requires = ["poetry-core"]
+build-backend = "poetry.core.masonry.api"

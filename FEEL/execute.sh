@@ -4,6 +4,9 @@
 export PATH=/usr/local/cuda/bin:$PATH
 export LD_LIBRARY_PATH=/usr/local/cuda/lib64:$LD_LIBRARY_PATH
 
-stamp = $(date +"%Y%m%d%H%M")
+stamp=$(date +"%Y%m%d%H%M")
 touch outs/$stamp.out
-python3 ECO_test.py > outs/$stamp.out
+
+# poetry run python ECO_test.py > outs/$stamp.out
+poetry run python runner.py
+# python3 ECO_test.py > outs/$stamp.out
