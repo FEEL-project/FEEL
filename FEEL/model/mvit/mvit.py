@@ -1,6 +1,6 @@
 import torch
 from torch import nn
-from torchvision.models.video import mvit_v1_b
+from torchvision.models.video import mvit_v1_b, MViT_V1_B_Weights
 from typing import Tuple
 
 from dataset.video_dataset import load_video_dataset
@@ -14,9 +14,12 @@ def _unsqueeze(x: torch.Tensor, target_dim: int, expand_dim: int) -> Tuple[torch
     return x, tensor_dim
 
 class EnhancedMViT(nn.Module):
-    def __init__(self):
+    def __init__(self, pretrained: bool = False):
         super().__init__()
-        self.base_model = mvit_v1_b()
+        if pretrained:
+            self.base_model = mvit_v1_b(weights=MViT_V1_B_Weights.DEFAULT)
+        else:
+            self.base_model = mvit_v1_b()
 
         # self.head = nn.Sequential(
         #     nn.Dropout(dropout, inplace=True),
