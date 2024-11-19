@@ -1,9 +1,18 @@
 import torch
 from torch import nn
-from torchvision.models.video import mvit_v1_b, _unsqueeze
 
-from SoccerNarration.FEEL.dataset.video_dataset import load_video_dataset
+from torchvision.models.video import mvit_v1_b
+from typing import Tuple
 
+from dataset.video_dataset import load_video_dataset
+
+def _unsqueeze(x: torch.Tensor, target_dim: int, expand_dim: int) -> Tuple[torch.Tensor, int]:
+    tensor_dim = x.dim()
+    if tensor_dim == target_dim - 1:
+        x = x.unsqueeze(expand_dim)
+    elif tensor_dim != target_dim:
+        raise ValueError(f"Unsupported input dimension {x.shape}")
+    return x, tensor_dim
 
 class my_MViT(nn.Module):
     def __init__(self):
@@ -16,31 +25,36 @@ class my_MViT(nn.Module):
         # )
 
 
-    def forward(self, x: torch.Tensor) -> torch.Tensor:
-        # Convert if necessary (B, C, H, W) -> (B, C, 1, H, W)
+    def forward(self, x:torch.Tensor) -> torch.Tensor:
+        """
+        x: [B, C, T, H, W] (C=3, T=16, H=224, W=224)
+        characteristics1: [B, T*H*W, embed_dim] (T=16, H=224, W=224, embed_dim=96)
+        """
         x = _unsqueeze(x, 5, 2)[0]
         # patchify and reshape: (B, C, T, H, W) -> (B, embed_channels[0], T', H', W') -> (B, THW', embed_channels[0])
-        x = self.conv_proj(x)
+        x = self.base_model.conv_proj(x)
         x = x.flatten(2).transpose(1, 2)
 
         # add positional encoding
-        x = self.pos_encoding(x)
+        x = self.base_model.pos_encoding(x)
+        self.characteristics1 = x   # x: characteristics1
 
         # pass patches through the encoder
-        thw = (self.pos_encoding.temporal_size,) + self.pos_encoding.spatial_size
-        for block in self.blocks:
+        thw = (self.base_model.pos_encoding.temporal_size,) + self.base_model.pos_encoding.spatial_size
+        for block in self.base_model.blocks:
             x, thw = block(x, thw)
-        x = self.norm(x)
-
+        x = self.base_model.norm(x)
         # classifier "token" as used by standard language architectures
         x = x[:, 0]
-        x = self.head(x)
+        # x = x.mean(dim=1)   # グローバルプーリング [B, T'*H'*W', dim]->[B, dim]
+        self.characteristics2 = x   # y: characteristics2
+        
+        x = self.base_model.head(x)
 
-        return x
+        return self.characteristics1, self.characteristics2, x
     
 
-def default_mvit():
-    video_dir = '/home/u01230/SoccerNarration/small_data'
+def default_mvit(video_dir: str):
     batch_size = 2
     clip_length = 16
     train_loader = load_video_dataset(video_dir, batch_size, clip_length)
@@ -58,4 +72,5 @@ def default_mvit():
 
 
 if __name__ == "__main__":
-    default_mvit()
+    mvit = my_MViT()
+
