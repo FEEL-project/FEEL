@@ -2,7 +2,7 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 from typing import Tuple, Optional
-from MViT import MultiScaleBlock
+from .multi_scale_transformer import MultiScaleBlock
 
 class PatchEmbed(nn.Module):
     """patch data to embedding

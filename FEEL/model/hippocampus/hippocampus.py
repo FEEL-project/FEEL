@@ -4,9 +4,9 @@ import faiss
 import torch
 import torch.nn as nn
 from torch.utils.data import WeightedRandomSampler, DataLoader
-from .Database import VectorDatabase
-from .EventDataset import EventDataset
-from .Episode import Episode
+from .database import VectorDatabase
+from .event_dataset import EventDataset
+from .episode import Episode
 
 class Hippocampus():
 	"""海馬: カスタムデータローダー的な位置付け

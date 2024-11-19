@@ -1,7 +1,7 @@
 import torch
 import torch.nn as nn
-from SubcorticalPathway.SubcorticalPathway import SubcorticalPathway
-from Controller.EvalController import EvalController
+from .subcortical_pathway import SubcorticalPathway
+from .controller import EvalController
 
 class Amygdala():
     """扁桃体: 感情評価を行う
