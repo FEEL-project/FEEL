@@ -13,7 +13,7 @@ def _unsqueeze(x: torch.Tensor, target_dim: int, expand_dim: int) -> Tuple[torch
         raise ValueError(f"Unsupported input dimension {x.shape}")
     return x, tensor_dim
 
-class my_MViT(nn.Module):
+class EnhancedMViT(nn.Module):
     def __init__(self):
         super().__init__()
         self.base_model = mvit_v1_b()
@@ -72,4 +72,4 @@ def default_mvit(video_dir: str):
 
 
 if __name__ == "__main__":
-    mvit = my_MViT()
+    mvit = EnhancedMViT()
