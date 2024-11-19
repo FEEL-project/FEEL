@@ -20,11 +20,18 @@
     bash ./k400_extractor.sh    # tar takes about 1 hours
     ```
 
+    classify every video with annotation. (You are supposed to be at `FEEL` directory)
+    ```py
+    cd data/kinetics-dataset
+    python3 arrange_by_classes.py ./k400
+    ```
+
 2. convert video to images
 
     Before start this, make sure that you are at the `FEEL/dataset` directory
     ```sh
-    converter.sh
+    # converter.sh # Legacy
+    
     ```
 
 3. execute test

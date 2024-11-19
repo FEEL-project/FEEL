@@ -3,11 +3,13 @@ import numpy as np
 from torch.utils.data import Dataset, DataLoader
 
 class EventDataset(Dataset):
-    def __init__(self, data=None, ids=None, evaluations=None):
+    def __init__(self, ids=None,  data=None, evaluations=None, priority=None):
         # Initialize with empty lists if no data provided
         self.data = np.array(data) if data is not None else np.empty((0,), dtype=object)
         self.ids = np.array(ids) if ids is not None else np.empty((0,), dtype=object)
         self.evaluations = np.array(evaluations) if evaluations is not None else np.empty((0,), dtype=object)
+        self.priority = np.array(priority) if priority is not None else np.empty((0,), dtype=object)
+        self._id_to_index = None
         
         # Validate input consistency
         if not (len(self.data) == len(self.ids) == len(self.evaluations)):
@@ -28,7 +30,8 @@ class EventDataset(Dataset):
 
     def _update_id_to_index_mapping(self):
         # Rebuild the id to index mapping (for thread safety)
-        self._id_to_index.clear()
+        if self._id_to_index is not None:
+            self._id_to_index.clear()
         self._id_to_index = {id_val: idx for idx, id_val in enumerate(self.ids)}
 
     def get_by_id(self, id_value):
