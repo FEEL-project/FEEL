@@ -1,4 +1,4 @@
-
+### Legacy (not used in the current version) ###
 
 class Episode():
 	"""

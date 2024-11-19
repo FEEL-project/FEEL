@@ -1,3 +1,4 @@
+from typing import List, Tuple, Optional, Dict, Union
 import numpy as np
 from queue import PriorityQueue	# MinHeap (heapq is not thread-safe)
 import faiss
@@ -16,49 +17,77 @@ class Hippocampus():
 	2. 新規eventについて、関連性の高いeventを検索し、それらを加味したepisodeを生成する
 	3. memory内のeventを、計算された重みで決まる確率に従ってreplayする
 	"""
-	def __init__(self, dimension, ):
+	def __init__(self, dimension=768, replay_rate=10, replay_iteration=5, size_episode=3):
 		# hyper-parameters
 		self.cnt_events = 0 # 現在までの総event数
 		self.num_events = 0 # 現在memoryに存在するeventの数
 		self.num_replay = 0 # これまでの総replay数
+		self.size_episode = size_episode 		# 生成するepisodeの長さ
 		# memory-loss
 		self.minimal_to_loss = 100 	# memory-lossが発生する最小のevent数
 		self.loss = True			# .no_loss()でFalse, .loss()でTrueに変更
 		self.loss_interval = 10 	# データセットからサンプルの削除頻度
 		self.loss_rate = 0.1 		# データセットから削除する割合
-		self.minimal_events = 100 	# replayが可能な最低限のevent数
 		self.max_events = 1000 		# memoryに格納可能な最大event数
-		self.replay_iteration = 5 	# 一度のreplayで生成するepisodeの数
-		self.size_episode = 3 		# 生成するepisodeの長さ
+		# replay parameters
+		self.minimal_events = 100 	# replayが可能な最低限のevent数
+		self.replay_rate = replay_rate 		# replayの頻度
+		self.replay_iteration = replay_iteration 	# 一度のreplayで生成するepisodeの数
 		
 		# memory(ベクトルデータベース), 類似度検索用
 		nlist = 100 # FAISSインデックスのクラスタ数
-		self.STM = VectorDatabase(dimension, index_type="IVF", nlist=40) # memory本体(Short-Term-Memory)
+		self.STM = VectorDatabase(dimension, index_type="Flat", nlist=40) # memory本体(Short-Term-Memory)
 		self.event_dataset = EventDataset() # memoryのデータセット, get_by_id()でアクセス可能
 		
-		# relevant dictionary
-		self.id_to_priority = {} # key:id, value:priority
-		self.list_priority = [] # index:id, data:priority
+		# priority hyper-parameters
+		self.self.base_priority = 100	# 新規eventのpriorityの基準値
+		self.priority_method = ['base', 'rate']	# [0]:priorityの初期化方法, [1]:priorityの更新方法
 		
 		# priorityの低いデータを削除するためのqueue
 		self.priority = PriorityQueue() # priorityによる優先度つきのeventキュー(MinHeap)
+		""" issue: priorityの初期値の与え方
+		1. すべてのeventに同じpriorityを与える
+		2. その時点でのmemory内のpriorityの最大値を基準にする
+		"""
 		
 		# generator
 		self.replay_generator = None
 		self.DataLoader = None
 		self.batch_size = 1
-		
-	def calc_priority(self, event_id, evaluation):
+	
+	def no_loss(self) -> bool:
+		self.loss = False
+  
+	def loss(self) -> bool:
+		self.loss = True
+  
+	def generate_id(self) -> int:
+		"""
+		新規eventに付与するidを生成する
+		"""
+		new_id = self.cnt_events
+		self.cnt_events += 1 
+		return new_id
+
+	def init_priority(self, event_id, evaluation, method:str='base'):
 		"""
 		時間(event_id)と感情(evaluation)から、memory内での優先度を計算する
 		"""
-		return np.abs(evaluation)+1
+		if method == 'base':
+			return np.abs(evaluation)+self.base_priority	# issue: np.absの使用が適切か
+		else:
+			raise ValueError("Invalid method.")
+		### issue: priorityの初期化方法を増やす
 
-	def no_loss(self):
-		self.loss = False
-  
-	def loss(self):
-		self.loss = True
+	def update_priority(self, event_id, method:str='rate', new_evaluation2=None, rate=1.0):
+		"""
+		methodを指定して、eventのpriorityを更新する
+		1. rate: priorityにevaluation1のrate倍を加算する
+		"""
+		self.event_dataset.update_priority(event_id, method, 
+                                     new_evaluation2=new_evaluation2, 
+                                     rate=rate)
+		### issue: 追加された更新方法に対応する引数を渡す
 		
 	def sample(self, batch_size=1):
 		"""
@@ -68,7 +97,7 @@ class Hippocampus():
 			return None
 		if self.replay_generator == None or self.num_replay % self.loss_interval == 0:
 			# 一定の頻度でsamplerに使うweightsを更新する
-			weights = torch.tensor(self.list_priority)
+			weights = self.event_dataset.get_priority()
 			self.replay_generator = WeightedRandomSampler(weights, self.replay_iteration)
 			self.DataLoader = DataLoader(self.event_dataset, sampler=self.replay_generator, batch_size=batch_size)
 		return next(iter(self.DataLoader))
@@ -88,7 +117,7 @@ class Hippocampus():
 			if event_id == -1:
 				raise ValueError("Neither event_id nor characteristics is given.")
 			characteristics = self.event_dataset.get_by_id(event_id)['characteristics']	# 要変更
-		return self.STM.search(characteristics, k)	# 要変更
+		return self.STM.search(characteristics, k)	#  
 		
 	def memory_loss(self):
 		"""
@@ -96,14 +125,15 @@ class Hippocampus():
 		例: 一定数のreplayの度に、memory中の比重が小さすぎるサンプルを削除する
 		"""
 		if self.num_events <= self.minimal_events or not self.loss:
+			# memoryが一定数未満の場合、またはlossがFalseの場合、何もしない
 			return
 		num_removed = int((self.num_events-self.minimal_events)*self.loss_rate) # 削除するeventの数
 		list_removed = [] # 削除されたeventのidリスト
 		for i in range(num_removed):
 			id_removed = self.priority.get()
 			list_removed.append(id_removed)
-			del self.id_to_priority[id_removed]	# 辞書の更新
-			del self.list_priority[id_removed]	# リストの更新
+			self.event_dataset.remove_by_id(id_removed)	# memory (EventDataset) から削除
+			self.STM.remove(id_removed)					# ShortTermMemory (VectorDatabase) から削除
 			
 	def replay(self, batch_size=1):
 		"""
@@ -114,54 +144,93 @@ class Hippocampus():
 		"""
 		# eventのサンプリング
 		event = self.sample(batch_size)
-		# priorityの更新: 要検討(アルゴリズム)
+		# priorityの更新
 		ids = event['id']
-		for i in range(len(ids)):
-			self.id_to_priority[event['id']] += np.abs(self.get_event(event['id'])['evaluation'].numpy())
+		for event_id in ids:
+			self.event_dataset.update_priority(event_id, method=self.priority_method[1])
 		# 更新・不要サンプルの削除
 		self.num_replay += batch_size
 		if self.loss and self.num_replay % self.loss_interval == 0:
 			self.memory_loss()
 		return event
 		
-	def generate_episode(self, event=None):
+	def generate_episode(self, event=None) -> List[Dict[str, Union[int, torch.tensor]]]:
 		"""
-		eventから過去の類似eventを検索して、episodeを1つ生成する
-		event==None(新たなeventが発生していないとき):
+		search events relevant to initiating event, and generate episode
+		if initiating event is not given (meditation mode),
 			event = replay()
 		"""
-		if event == None:
+		### issue: mini-batchへの対応
+		if self.num_events <= self.minimal_events:
 			return
-		event_id = event['id']
-		id_list = self.search(k=self.size_episode-1, 
-											characteristics=event['characteristics'])
-		episode = [event]
+		if event == None:	# meditation mode
+			event = self.replay()
+		if event.get('id') == None:
+			raise ValueError("event_id is inappropriate.")
+		
+		result_list = self.search(k=self.size_episode-1, 
+											characteristics=event['characteristics']) # List[Tuple[str, torch.tensor]]
+		episode = [event] # initiating event
 		for i in range(self.size_episode-1):
-			episode.append(self.get_event(id_list[i]))	# nucleur event
-		return episode
+			episode.append(self.get_event(result_list[i][0]))	# result_list[i][0]: event_id, result_list[i][1]: distance	
+		return episode 
+		# [{'id': event_id, 'characteristics': characteristics, 'evaluation1': evaluation1, 'evaluation2': evaluation2}, ...]
 		
-	def receive(self, event_id, characteristics, evaluation):
+	def receive(self, characteristics=None, evaluation1=None):
 		"""
-		知覚したeventの特徴量を一次感覚野から受け取る
+		知覚したeventに関連する情報を受け取り、辞書フォーマットで返す
 		1. 受け取ったeventの特徴量を、以下と対応させてmemoryに格納
-			# 現時刻(event_id)
-			# 扁桃体からの感情
-		2. 関連するeventを検索し、対応づけたepisodeを生成する
-		"""
-		# memoryに格納
-		self.event_dataset.add_item(event_id, characteristics, evaluation)
-		self.STM.add(event_id, characteristics)
-		priority = self.calc_priority(event_id, evaluation)
-		self.priority.put((event_id, priority))
-  
-		event = self.get_event(event_id)
-		
-		# episode生成
-		if self.num_events > self.minimal_events:
-			# 一定数のeventがmemoryにある場合、関連eventを検索してepisode生成する
-			episode = self.generate_episode(event)
-			return episode # torch.tensor
-		else:
-			return None
 			
+		"""
+		event = {}
+		event_id = self.generate_id()
+		event['id'] = event_id
+		if characteristics is not None:
+			event['characteristics'] = characteristics
+		if evaluation1 is not None:
+			event['evaluation1'] = evaluation1
+		return event # {'id': event_id, 'characteristics': characteristics, 'evaluation1': evaluation1}
+		# evaluation2 is calculated in Prefrontal-Cortex, Evaluation-Controller
+		
+		# out-source to generate_episode()
+		# # episode生成
+		# if self.num_events > self.minimal_events:
+		# 	# 一定数のeventがmemoryにある場合、関連eventを検索してepisode生成する
+		# 	episode = self.generate_episode(event)
+		# 	return episode # torch.tensor
+		# else:
+		# 	return None
+			
+	def save_to_memory(self, event,
+                    event_id: int =-1, characteristics = None,
+                    evaluation1 = None, evaluation2 = None, 
+                    priority: float = 0.0):
+		"""
+		save new event to memory
+		0. event: {'id': event_id, 'characteristics': characteristics,
+					'evaluation1': evaluation1, 'evaluation2': evaluation2}
+		以下 event の不足分を補完する
+		1. event_id: id of new event
+		2. characteristics: characteristics found by Sensory-Cortex (torch.tensor, size=(B,768))
+		3. evaluation1: evaluation of new event by Subcortical-Pathway (torch.tensor, size=(B,1))
+		4. evaluation2: evaluation of new event by Evaluation-Controller (torch.tensor, size=(B,8))
+		5. priority: priority of new event
+		"""
+		### issue: error handling
+		if event_id == -1 and 'id' in event:
+			event_id = event['id']
+		if characteristics == None and 'characteristics' in event:
+			characteristics = event['characteristics']
+		if evaluation1 == None and 'evaluation1' in event:
+			evaluation1 = event['evaluation1']
+		if evaluation2 == None and 'evaluation2' in event:
+			evaluation2 = event['evaluation2']
+		if priority == 0.0:
+			priority = self.init_priority(event_id, evaluation1, self.priority_method[0])
+   
+		# memoryに格納
+		self.event_dataset.add_item(event_id, characteristics, evaluation1, evaluation2, priority)
+		self.STM.add(event_id, characteristics)
+		self.priority.put((event_id, priority))
+		
 		
