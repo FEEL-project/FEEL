@@ -5,7 +5,7 @@ from typing import List, Tuple, Optional
 import threading
 
 class VectorDatabase():
-    def __init__(self, dimension: int, index_type: str = "IVF"):
+    def __init__(self, dimension: int, index_type: str = "Flat"):
         """
         Args:
             dimension: Vector dimension

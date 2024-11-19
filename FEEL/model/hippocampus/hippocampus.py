@@ -16,7 +16,7 @@ class Hippocampus():
 	2. 新規eventについて、関連性の高いeventを検索し、それらを加味したepisodeを生成する
 	3. memory内のeventを、計算された重みで決まる確率に従ってreplayする
 	"""
-	def __init__(self, dimension, ):
+	def __init__(self, dimension, replay_rate=10, replay_iteration=5, size_episode=3):
 		# hyper-parameters
 		self.cnt_events = 0 # 現在までの総event数
 		self.num_events = 0 # 現在memoryに存在するeventの数
@@ -28,12 +28,13 @@ class Hippocampus():
 		self.loss_rate = 0.1 		# データセットから削除する割合
 		self.minimal_events = 100 	# replayが可能な最低限のevent数
 		self.max_events = 1000 		# memoryに格納可能な最大event数
-		self.replay_iteration = 5 	# 一度のreplayで生成するepisodeの数
-		self.size_episode = 3 		# 生成するepisodeの長さ
+		self.replay_rate = replay_rate 		# replayの頻度
+		self.replay_iteration = replay_iteration 	# 一度のreplayで生成するepisodeの数
+		self.size_episode = size_episode 		# 生成するepisodeの長さ
 		
 		# memory(ベクトルデータベース), 類似度検索用
 		nlist = 100 # FAISSインデックスのクラスタ数
-		self.STM = VectorDatabase(dimension, index_type="IVF", nlist=40) # memory本体(Short-Term-Memory)
+		self.STM = VectorDatabase(dimension, index_type="Flat", nlist=40) # memory本体(Short-Term-Memory)
 		self.event_dataset = EventDataset() # memoryのデータセット, get_by_id()でアクセス可能
 		
 		# relevant dictionary
