@@ -21,6 +21,8 @@ class Hippocampus():
 		self.cnt_events = 0 # 現在までの総event数
 		self.num_events = 0 # 現在memoryに存在するeventの数
 		self.num_replay = 0 # これまでの総replay数
+		# memory-loss
+		self.loss = True	# .no_loss()でFalse, .loss()でTrueに変更
 		self.loss_interval = 10 # データセットからサンプルの削除頻度
 		self.loss_rate = 0.1 # データセットから削除する割合
 		self.minimal_events = 100 # replayが可能な最低限のevent数
@@ -30,10 +32,9 @@ class Hippocampus():
 		# memory(ベクトルデータベース), 類似度検索用
 		nlist = 100 # FAISSインデックスのクラスタ数
 		self.STM = VectorDatabase(dimension, index_type="IVF", nlist=40) # memory本体(Short-Term-Memory)
-		self.event_dataset = EventDataset([], [], []) # memoryのデータセット
+		self.event_dataset = EventDataset([], [], []) # memoryのデータセット, get_by_id()でアクセス可能
 		
 		# relevant dictionary
-		self.id_to_memory = {} # key:id, value:(characteristics, evaluation)
 		self.id_to_priority = {} # key:id, value:priority
 		self.list_priority = [] # index:id, data:priority
 		
@@ -49,8 +50,15 @@ class Hippocampus():
 		"""
 		時間(event_id)と感情(evaluation)から、memory内での優先度を計算する
 		"""
+		return np.abs(evaluation)+1
+
+	def no_loss(self):
+		self.loss = False
+  
+	def loss(self):
+		self.loss = True
 		
-	def __iter__(self):
+	def sample(self, batch_size=1):
 		"""
 		一つサンプルを生成する
 		"""
@@ -60,15 +68,15 @@ class Hippocampus():
 			# 一定の頻度でsamplerに使うweightsを更新する
 			weights = torch.tensor(self.list_priority)
 			self.replay_generator = WeightedRandomSampler(weights, self.replay_iteration)
-			self.DataLoader = DataLoader(self.event_dataset, sampler=self.replay_generator, batch_size=1)
+			self.DataLoader = DataLoader(self.event_dataset, sampler=self.replay_generator, batch_size=batch_size)
 		return next(iter(self.DataLoader))
 	
-	def get_characteristics(self, event_id):
+	def get_event(self, event_id):
 		"""
 		event_idからcharacteristicsを取得する
 		"""
-		characteristics = self.id_to_memory(event_id)
-		return characteristics
+		event = self.event_dataset.get_by_id(event_id)
+		return event
 		
 	def search(self, k=5, event_id=-1, characteristics=None):
 		"""
@@ -77,7 +85,7 @@ class Hippocampus():
 		if characteristics == None:
 			if event_id == -1:
 				raise ValueError("Neither event_id nor characteristics is given.")
-			characteristics = self.id_to_memory(event_id)
+			characteristics = self.event_dataset.get_by_id(event_id)['characteristics']	# 要変更
 		return self.STM.search(characteristics, k)
 		
 	def memory_loss(self):
@@ -85,16 +93,17 @@ class Hippocampus():
 		memory中の比重が小さすぎるサンプルを削除する
 		例: 一定数のreplayの度に、memory中の比重が小さすぎるサンプルを削除する
 		"""
-		if self.num_events <= self.minimal_events:
+		if self.num_events <= self.minimal_events or not self.loss:
 			return
 		num_removed = int((self.num_events-self.minimal_events)*self.loss_rate) # 削除するeventの数
 		list_removed = [] # 削除されたeventのidリスト
 		for i in range(num_removed):
 			id_removed = self.priority.get()
 			list_removed.append(id_removed)
-			self.id_to_priority[id_removed] = 0
+			del self.id_to_priority[id_removed]	# 辞書の更新
+			del self.list_priority[id_removed]	# リストの更新
 			
-	def replay(self):
+	def replay(self, batch_size=1):
 		"""
 		1. memoryから自発的にeventをサンプリングし、前頭前野へと出力する
 			# eventからの経過時間
@@ -102,9 +111,14 @@ class Hippocampus():
 		2. 必要に応じて、weightが小さすぎるサンプルを削除する
 		"""
 		# eventのサンプリング
-		event = self.__iter__()
+		event = self.sample(batch_size)
+		# priorityの更新
+		ids = event['id']
+		for i in range(len(ids)):
+			self.id_to_priority[event['id']] += np.abs(self.get_event(event['id'])['evaluation'].numpy())
+   
 		# 更新・不要サンプルの削除
-		self.num_replay += 1
+		self.num_replay += batch_size
 		if self.num_replay % self.loss_interval == 0:
 			self.memory_loss()
 		return event
@@ -122,8 +136,7 @@ class Hippocampus():
 											characteristics=characteristics)
 		episode = []
 		for i in range(len(id_list)):
-			episode.append(self.get_characteristics(id_list[i]))
-		episode = torch.tensor(episode)
+			episode.append(self.get_event(id_list[i]))
 		return episode
 		
 	def receive(self, event_id, characteristics, evaluation):
@@ -135,6 +148,7 @@ class Hippocampus():
 		2. 関連するeventを検索し、対応づけたepisodeを生成する
 		"""
 		# memoryに格納
+		self.event_dataset.add_item(event_id, characteristics, evaluation)
 		self.STM.add(event_id, characteristics)
 		priority = self.calc_priority(event_id, evaluation)
 		self.priority.put((event_id, priority))

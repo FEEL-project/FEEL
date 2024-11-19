@@ -1,5 +1,6 @@
 import torch
 from torch import nn
+
 from torchvision.models.video import mvit_v1_b
 from typing import Tuple
 
@@ -72,3 +73,4 @@ def default_mvit(video_dir: str):
 
 if __name__ == "__main__":
     mvit = my_MViT()
+
