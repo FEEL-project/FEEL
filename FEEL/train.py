@@ -247,7 +247,6 @@ if __name__ == "__main__":
     )
     model_subcortical_pathway = SubcorticalPathway().to(device=DEVICE)
     model_controller = EvalController().to(device=DEVICE)
-
     # load_model(
     #     model_pfc=model_pfc,
     #     model_hippocampus=model_hippocampus,
@@ -255,7 +254,7 @@ if __name__ == "__main__":
     #     model_controller=model_controller,
     #     id="0"
     # )
-
+    # model_hippocampus = HippocampusRefactored.load_from_file(f"./weights/hippocampus_{0}.pkl")
     train_models(
         train_loader,
         model_mvit,
