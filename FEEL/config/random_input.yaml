@@ -27,3 +27,4 @@ model_paths:
   subcortical_pathway: ./weights/SCP_XXXXXX.pth
   controller: ./weights/controller_XXXXXX.pth
   prefrontal_cortex: ./weights/PFC_XXXXXX.pth
+  mvit: ./weights/MViT_XXXXXX.pth
