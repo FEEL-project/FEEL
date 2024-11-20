@@ -55,9 +55,13 @@ def seeing(video_dir: str):
     elaborator.eval()
     mvit.eval()
     for inputs, labels in train_loader:
+        print("inputs")
+        print(inputs.shape)
+        print("labels")
+        print(labels)
         with torch.no_grad():
             c1, c2, outputs = mvit(inputs)
-            # event = elaborator.hippocampus.receive(characteristics=c2, evaluation=labels, event_id=0)
+            event = elaborator.hippocampus.receive(characteristics=c2, evaluation1=labels)
             # episode = elaborator.hippocampus.generate_episode(event)
             pre_eval = elaborator.prefrontal_cortex(c2)
             # pre_eval = elaborator.prefrontal_cortex(episode)
