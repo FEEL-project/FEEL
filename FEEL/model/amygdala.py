@@ -8,12 +8,12 @@ class Amygdala():
     SubcorticalPath: x1 (rough characteristics) -> evaluation1 (impulsive emotion)
     EvalController: evaluation1, pre_evaluation -> evaluation2 (deliberate emotion)
     """
-    def __init__(self, ):
+    def __init__(self, SubcorticalPathway: SubcorticalPathway, EvalController: EvalController):
         super(Amygdala, self).__init__()
         self.meditation = False     # if True, the model is in meditation mode
-        self.SubcorticalPath = SubcorticalPathway()
+        self.SubcorticalPath = SubcorticalPathway
         self.evaluation1 = None     # evaluation by Subcortical Pathway
-        self.EvalController = EvalController()
+        self.EvalController = EvalController
         self.evaluation2 = None     # evaluation by Evaluation Controller
         
     def forward(self, x1=None, evaluation1=None, pre_evaluation=None):

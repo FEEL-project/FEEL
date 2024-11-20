@@ -2,7 +2,7 @@
 
 紹介文
 
-## Usage
+## Installation
 
 1. download dataset
 
@@ -20,16 +20,22 @@
     bash ./k400_extractor.sh    # tar takes about 1 hours
     ```
 
-2. convert video to images
-
-    Before start this, make sure that you are at the `FEEL/dataset` directory
-    ```sh
-    converter.sh
+    classify every video with annotation. (You are supposed to be at `FEEL` directory)
+    ```py
+    cd data/kinetics-dataset
+    python3 arrange_by_classes.py ./k400
     ```
 
-3. execute test
+## Usage
 
-    Before start this, make sure that you are at the `FEEL` directory
-    ```sh
-    sbatch execute.sh
-    ```
+1. edit yaml configure
+
+    open `config/XXXXX.yaml`, edit this.
+    
+2. execute below.
+
+```sh
+python3 runner.py --config config/random_input.yaml
+```
+
+### train
