@@ -37,12 +37,11 @@ class Hippocampus():
 		self.replay_iteration = replay_iteration 	# 一度のreplayで生成するepisodeの数
 		
 		# memory(ベクトルデータベース), 類似度検索用
-		nlist = 100 # FAISSインデックスのクラスタ数
-		self.STM = VectorDatabase(dimension, index_type="Flat", nlist=40) # memory本体(Short-Term-Memory)
+		self.STM = VectorDatabase(dimension, index_type="Flat") # memory本体(Short-Term-Memory)
 		self.event_dataset = EventDataset() # memoryのデータセット, get_by_id()でアクセス可能
 		
 		# priority hyper-parameters
-		self.self.base_priority = 100	# 新規eventのpriorityの基準値
+		self.base_priority = 100	# 新規eventのpriorityの基準値
 		self.priority_method = ['base', 'rate']	# [0]:priorityの初期化方法, [1]:priorityの更新方法
 		
 		# priorityの低いデータを削除するためのqueue

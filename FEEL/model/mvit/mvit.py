@@ -27,7 +27,7 @@ class EnhancedMViT(nn.Module):
         # )
 
 
-    def forward(self, x:torch.Tensor) -> tuple[torch.Tensor, torch.Tensor, torch.Tensor]:
+    def forward(self, x:torch.Tensor) -> Tuple[torch.Tensor, torch.Tensor, torch.Tensor]:
         """
         x: [B, C, T, H, W] (C=3, T=16, H=224, W=224)
         characteristics1: [B, T*H*W, embed_dim] (T=16, H=224, W=224, embed_dim=96)
