@@ -2,6 +2,7 @@ FEEL/dataset/Miniconda3-latest-Linux-x86_64.sh
 FEEL/data/kinetics-dataset/wget-log
 poetry.lock
 pyproject.toml
+slurm-*
 
 # Byte-compiled / optimized / DLL files
 __pycache__/
