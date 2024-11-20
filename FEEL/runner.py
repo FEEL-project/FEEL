@@ -81,7 +81,7 @@ def seeing(video_dir: str):
                                                           evaluation2=evaluation2)
             else:
                 ### issue: hippocampusに十分な数のeventがないため、episodeが生成されない
-                print(elaborator.hippocampus.num_events)
+                # print(elaborator.hippocampus.num_events)
                 episode = elaborator.hippocampus.generate_episode(events, batch_size=batch_size)
                 print("episode")
                 print(episode)

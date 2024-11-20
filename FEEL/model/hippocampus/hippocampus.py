@@ -176,12 +176,12 @@ class Hippocampus():
 			if event.get('id') == None:
 				raise ValueError("event_id is inappropriate.")
 			result_list = self.search(k=self.size_episode-1, 
-											characteristics=event['characteristics']) # List[Tuple[str, torch.tensor]]
-			print(result_list)
+											characteristics=event['characteristics']) # List[Tuple[int, float]]
 			episode = [event.get('characteristics')] # initiating event of episode i
 			for j in range(self.size_episode-1):
 				episode.append(self.get_event(result_list[j][0])['characteristics'])	# result_list[j][0]: event_id, result_list[j][1]: distance
-			episode_batch.append(episode)
+			episode_tensor = torch.stack(episode)
+			episode_batch.append(episode_tensor)
 		out = torch.stack(episode_batch)
 		# print(out.shape)
 		return out
@@ -237,7 +237,7 @@ class Hippocampus():
    
 		# memoryに格納
 		self.event_dataset.add_item(event_id, characteristics, evaluation1, evaluation2, priority)
-		print(f"event_id: {event_id}, characteristics: {characteristics.shape}")
+		# print(f"event_id: {event_id}, characteristics: {characteristics.shape}")
 		self.STM.add(event_id, characteristics)
 		self.priority.put((event_id, priority))
 		self.num_events += 1
