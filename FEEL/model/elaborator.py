@@ -7,6 +7,7 @@ from .prefrontal_cortex import PFC
 from .hippocampus import Hippocampus
 from .subcortical_pathway import SubcorticalPathway
 from .controller import EvalController
+from .subcortical_pathway import SubcorticalPathway
 
 class Elaborator(nn.Module):
     def __init__(self, 
@@ -89,7 +90,7 @@ class Elaborator(nn.Module):
     def train_expectation(self, optimizer):
         """
         bring amy_eval closer to pre_eval
-        in order to train the controller
+        in order to train the controller and make PFC more dominant
         """
         self.prefrontal_cortex.eval()
         self.controller.train()
