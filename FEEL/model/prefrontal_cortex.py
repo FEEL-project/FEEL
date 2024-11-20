@@ -2,6 +2,7 @@ import torch
 import torch.nn as nn
 import math
 
+
 class PFCPositionalEncoding(nn.Module):
     def __init__(self, dim_event: int = 768, num_events:int = 5, dropout: float=0.1):
         super().__init__()
@@ -32,6 +33,7 @@ class PFC(nn.Module):
     1. NeoCortex (新皮質): x (characteristics2) -> 512 knowledge
     2. DLPFC (背外側前頭前野): 512 knowledge -> 8 intelligence
     """
+
     def __init__(
         self,
         dim_event:int = 768,
