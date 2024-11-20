@@ -30,7 +30,7 @@ class Elaborator(nn.Module):
         self.prefrontal_cortex.train()
         self.controller.train()
         for i in range(self.hippocampus.num_events):
-            event = self.hippocampus.__get_characteristics__(i)
+            event = self.hippocampus.get_event(i)
             eval_1 = event["eval_1"]
             episode = self.hippocampus.generate_episode(event)
             pre_eval = self.prefrontal_cortex(episode)
@@ -45,7 +45,7 @@ class Elaborator(nn.Module):
         self.controller.eval()
         total_loss = 0
         for i in range(self.hippocampus.num_events):
-            event = self.hippocampus.__get_characteristics__(i)
+            event = self.hippocampus.get_event(i)
             eval_1 = event["eval_1"]
             episode = self.hippocampus.generate_episode(event)
             with torch.no_grad():
@@ -59,7 +59,7 @@ class Elaborator(nn.Module):
         self.prefrontal_cortex.eval()
         self.controller.train()
         for i in range(self.hippocampus.num_events):
-            event = self.hippocampus.__get_characteristics__(i)
+            event = self.hippocampus.get_event(i)
             eval_1 = event["eval_1"]
             episode = self.hippocampus.generate_episode(event)
             with torch.no_grad():

@@ -26,7 +26,8 @@ class EventDataset(Dataset):
         return {
             'id': self.ids[idx], 
             'data': torch.from_numpy(self.data[idx]).float(),
-            'evaluation1': torch.from_numpy(self.evaluation1s[idx]).float()
+            'evaluation1': torch.from_numpy(self.evaluation1s[idx]).float(),
+            'evaluation2': torch.from_numpy(self.evaluation2s[idx]).float()
         }
         
     def get_priority(self) -> torch.Tensor:

@@ -130,7 +130,7 @@ class Hippocampus():
 		num_removed = int((self.num_events-self.minimal_events)*self.loss_rate) # 削除するeventの数
 		list_removed = [] # 削除されたeventのidリスト
 		for i in range(num_removed):
-			id_removed = self.priority.get()
+			id_removed, priority_removed = self.priority.get()
 			list_removed.append(id_removed)
 			self.event_dataset.remove_by_id(id_removed)	# memory (EventDataset) から削除
 			self.STM.remove(id_removed)					# ShortTermMemory (VectorDatabase) から削除
@@ -154,27 +154,29 @@ class Hippocampus():
 			self.memory_loss()
 		return event
 		
-	def generate_episode(self, event=None) -> List[Dict[str, Union[int, torch.tensor]]]:
+	def generate_episode(self, event=None, batch_size=1) -> torch.tensor:
 		"""
 		search events relevant to initiating event, and generate episode
-		if initiating event is not given (meditation mode),
-			event = replay()
+		episode: characteristics of initiating event, that of relevant events
+		episode_batch : torch.tensor([episode1, episode2, ...]) (size=(B, size_episode, 768))
 		"""
 		### issue: mini-batchへの対応
 		if self.num_events <= self.minimal_events:
-			return
-		if event == None:	# meditation mode
-			event = self.replay()
+			return None
 		if event.get('id') == None:
 			raise ValueError("event_id is inappropriate.")
 		
-		result_list = self.search(k=self.size_episode-1, 
-											characteristics=event['characteristics']) # List[Tuple[str, torch.tensor]]
-		episode = [event] # initiating event
-		for i in range(self.size_episode-1):
-			episode.append(self.get_event(result_list[i][0]))	# result_list[i][0]: event_id, result_list[i][1]: distance	
-		return episode 
-		# [{'id': event_id, 'characteristics': characteristics, 'evaluation1': evaluation1, 'evaluation2': evaluation2}, ...]
+		episode_batch = []
+		for i in range(batch_size):
+			result_list = self.search(k=self.size_episode-1, 
+											characteristics=event['characteristics'][i]) # List[Tuple[str, torch.tensor]]
+			episode = [event.get('characteristics')[i]] # initiating event of episode i
+			for j in range(self.size_episode-1):
+				episode.append(self.get_event(result_list[j][0])['characteristics'])	# result_list[j][0]: event_id, result_list[j][1]: distance
+			episode_batch.append(episode)
+		out = torch.stack(episode_batch)
+		# print(out.shape)
+		return out
 		
 	def receive(self, characteristics=None, evaluation1=None):
 		"""
@@ -191,15 +193,6 @@ class Hippocampus():
 			event['evaluation1'] = evaluation1
 		return event # {'id': event_id, 'characteristics': characteristics, 'evaluation1': evaluation1}
 		# evaluation2 is calculated in Prefrontal-Cortex, Evaluation-Controller
-		
-		# out-source to generate_episode()
-		# # episode生成
-		# if self.num_events > self.minimal_events:
-		# 	# 一定数のeventがmemoryにある場合、関連eventを検索してepisode生成する
-		# 	episode = self.generate_episode(event)
-		# 	return episode # torch.tensor
-		# else:
-		# 	return None
 			
 	def save_to_memory(self, event,
                     event_id: int =-1, characteristics = None,
@@ -226,11 +219,9 @@ class Hippocampus():
 		if evaluation2 == None and 'evaluation2' in event:
 			evaluation2 = event['evaluation2']
 		if priority == 0.0:
-			priority = self.init_priority(event_id, evaluation1, self.priority_method[0])
+			priority = self.init_priority(event_id, evaluation1, method=self.priority_method[0])
    
 		# memoryに格納
 		self.event_dataset.add_item(event_id, characteristics, evaluation1, evaluation2, priority)
 		self.STM.add(event_id, characteristics)
 		self.priority.put((event_id, priority))
-		
-		
