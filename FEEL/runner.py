@@ -73,5 +73,5 @@ def seeing(video_dir: str):
 
 
 if __name__ == "__main__":
-    seeing("/home/ghoti/FEEL/FEEL/data/small_data/renamed")
-    enhanced_mvit("data/small_data/renamed")
+    seeing("./data/small_data/renamed")
+    # enhanced_mvit("./data/small_data/renamed")
