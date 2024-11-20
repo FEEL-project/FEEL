@@ -71,7 +71,7 @@ def seeing(video_dir: str):
         with torch.no_grad():
             c1, c2, outputs = mvit(inputs)
             # print(f"shape of c2: {c2.shape}, shape of labels: {labels.shape}")
-            events = elaborator.hippocampus.receive(characteristics=c2, evaluation1=labels) ### issue: mini-batchに対応していない
+            events = elaborator.hippocampus.receive(characteristics=c2, evaluation1=labels) ### issue: mini-batchに対応していない->解消
             # print("event")
             # print(f"length of event['id']: {len(event['id'])}, shape of event['characteristics']: {event['characteristics'].shape},shape of event['evaluation1']: {event['evaluation1'].shape}")
             if cnt < 10:

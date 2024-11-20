@@ -110,6 +110,8 @@ class Hippocampus():
 		event_idからcharacteristicsを取得する
 		"""
 		event = self.event_dataset.get_by_id(event_id)
+		if event == None:
+			raise ValueError("Invalid event_id.")
 		return event
 		
 	def search(self, k=5, event_id=-1, characteristics=None):
@@ -163,7 +165,7 @@ class Hippocampus():
 		episode: characteristics of initiating event, that of relevant events
 		episode_batch : torch.tensor([episode1, episode2, ...]) (size=(B, size_episode, 768))
 		"""
-		### issue: mini-batchへの対応
+		### issue: mini-batchへの対応->解消
 		if self.num_events < self.minimal_to_generate:
 			return None
 		if len(events) != batch_size:
@@ -175,6 +177,7 @@ class Hippocampus():
 				raise ValueError("event_id is inappropriate.")
 			result_list = self.search(k=self.size_episode-1, 
 											characteristics=event['characteristics']) # List[Tuple[str, torch.tensor]]
+			print(result_list)
 			episode = [event.get('characteristics')] # initiating event of episode i
 			for j in range(self.size_episode-1):
 				episode.append(self.get_event(result_list[j][0])['characteristics'])	# result_list[j][0]: event_id, result_list[j][1]: distance
