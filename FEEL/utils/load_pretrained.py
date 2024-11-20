@@ -1,4 +1,6 @@
 """学習済みモデルをロードする関数の定義"""
+import yaml
+import torch
 
 def load_pretrained_ECO(model_dict, pretrained_model_dict):
     """学習済みモデルをロードする関数
@@ -24,3 +26,9 @@ def load_pretrained_ECO(model_dict, pretrained_model_dict):
         print(str(key_name)+"→"+str(name))
 
     return new_state_dict
+
+def load_config(config_path):
+    """設定ファイルを読み込む関数"""
+    with open(config_path) as f:
+        config = yaml.safe_load(f)
+    return config

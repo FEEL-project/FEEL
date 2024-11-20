@@ -1,4 +1,6 @@
 from typing import List, Tuple, Optional, Dict, Union
+import os
+import pickle
 import numpy as np
 from queue import PriorityQueue	# MinHeap (heapq is not thread-safe)
 import faiss
@@ -225,3 +227,66 @@ class Hippocampus():
 		self.event_dataset.add_item(event_id, characteristics, evaluation1, evaluation2, priority)
 		self.STM.add(event_id, characteristics)
 		self.priority.put((event_id, priority))
+  
+	def save_to_file(self, file_path):
+		"""
+		save memory to file
+		USAGE:
+			hippocampus.save_to_file('memory.pkl')
+		"""
+		base, _ = os.path.splitext(file_path)
+		dataset_file = f"{base}_dataset.pkl"
+		self.event_dataset.save_to_file(dataset_file) # save memory to file
+		db_file = f"{base}_db.pkl"
+		self.STM.save_to_file(db_file)	# save memory to file
+		with open(file_path, 'wb') as f:
+			# Save the rest of the object
+			pickle.dump({
+				'cnt_events': self.cnt_events,
+				'num_events': self.num_events,
+				'num_replay': self.num_replay,
+				'size_episode': self.size_episode,
+				'minimal_to_loss': self.minimal_to_loss,
+				'loss': self.loss,
+				'loss_interval': self.loss_interval,
+				'loss_rate': self.loss_rate,
+				'max_events': self.max_events,
+				'minimal_events': self.minimal_events,
+				'replay_rate': self.replay_rate,
+				'replay_iteration': self.replay_iteration,
+				'base_priority': self.base_priority,
+				'priority_method': self.priority_method,
+				'priority': self.priority
+			}, f)
+
+	@staticmethod
+	def load_from_file(file_path):
+		"""
+		load memory from file
+		USAGE:
+			hippocampus = Hippocampus.load_from_file('memory.pkl')
+		"""
+		base, _ = os.path.splitext(file_path)
+		dataset_file = f"{base}_dataset.pkl"
+		db_file = f"{base}_db.pkl"
+		hippocampus = Hippocampus()
+		hippocampus.event_dataset = EventDataset.load_from_file(dataset_file)
+		hippocampus.STM = VectorDatabase.load_from_file(db_file)
+		with open(file_path, 'rb') as f:
+			obj = pickle.load(f)
+			hippocampus.cnt_events = obj['cnt_events']
+			hippocampus.num_events = obj['num_events']
+			hippocampus.num_replay = obj['num_replay']
+			hippocampus.size_episode = obj['size_episode']
+			hippocampus.minimal_to_loss = obj['minimal_to_loss']
+			hippocampus.loss = obj['loss']
+			hippocampus.loss_interval = obj['loss_interval']
+			hippocampus.loss_rate = obj['loss_rate']
+			hippocampus.max_events = obj['max_events']
+			hippocampus.minimal_events = obj['minimal_events']
+			hippocampus.replay_rate = obj['replay_rate']
+			hippocampus.replay_iteration = obj['replay_iteration']
+			hippocampus.base_priority = obj['base_priority']
+			hippocampus.priority_method = obj['priority_method']
+			hippocampus.priority = obj['priority']
+		return hippocampus

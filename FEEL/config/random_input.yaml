@@ -1,0 +1,29 @@
+general:
+
+data:
+  data_path: ./data/XXX/YYY
+  data_name: data.csv
+
+model_params:
+  sensory_cortex:
+    
+  hippocampus:
+    dimension: 768
+    replay_rate: 10
+    replay_iteration: 5
+    size_episode: 3
+    base_priority: 100
+    priority_method: ['base', 'rate']
+
+  subcortical_pathway:
+
+  controller:
+
+  prefrontal_cortex:
+
+model_paths:
+  sensory_cortex: ./weights/sensor_XXXXXX.pth
+  hippocampus: ./weights/hippocampus_XXXXXX.pkl
+  subcortical_pathway: ./weights/SCP_XXXXXX.pth
+  controller: ./weights/controller_XXXXXX.pth
+  prefrontal_cortex: ./weights/PFC_XXXXXX.pth

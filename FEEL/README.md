@@ -2,7 +2,7 @@
 
 紹介文
 
-## Usage
+## Installation
 
 1. download dataset
 
@@ -26,17 +26,16 @@
     python3 arrange_by_classes.py ./k400
     ```
 
-2. convert video to images
+## Usage
 
-    Before start this, make sure that you are at the `FEEL/dataset` directory
-    ```sh
-    # converter.sh # Legacy
+1. edit yaml configure
+
+    open `config/XXXXX.yaml`, edit this.
     
-    ```
+2. execute below.
 
-3. execute test
+```sh
+python3 runner.py --config config/random_input.yaml
+```
 
-    Before start this, make sure that you are at the `FEEL` directory
-    ```sh
-    sbatch execute.sh
-    ```
+### train

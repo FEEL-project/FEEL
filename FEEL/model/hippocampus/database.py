@@ -1,4 +1,4 @@
-
+import os
 import numpy as np
 import faiss
 from typing import List, Tuple, Optional
@@ -119,3 +119,34 @@ class VectorDatabase():
     def __len__(self) -> int:
         """Return number of vectors in database."""
         return self.index.ntotal
+    
+    def save_to_file(self, file_path: str) -> None:
+        """Save index to file."""
+        with self.lock:
+            base, _ = os.path.splitext(file_path)
+            faiss_file = f"{base}_index.faiss"
+            faiss.write_index(self.index, faiss_file)
+            with open(file_path, 'wb') as f:
+                # Save the rest of the object
+                pickle.dump({
+                    'dimension': self.dimension,
+                    'id_map': self.id_map,
+                    'reverse_id_map': self.reverse_id_map,
+                    'next_index': self.next_index,
+                    'is_trained': self.is_trained
+                }, f)
+                
+    @staticmethod
+    def load_from_file(file_path:str):
+        """Load index from file."""
+        with open(file_path, 'rb') as f:
+            obj = pickle.load(f)
+            db = VectorDatabase(obj['dimension'])
+            db.id_map = obj['id_map']
+            db.reverse_id_map = obj['reverse_id_map']
+            db.next_index = obj['next_index']
+            db.is_trained = obj['is_trained']
+            base, _ = os.path.splitext(file_path)
+            faiss_file = f"{base}_index.faiss"
+            db.index = faiss.read_index(faiss_file)
+            return db

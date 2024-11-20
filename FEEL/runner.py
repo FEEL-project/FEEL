@@ -44,4 +44,4 @@ def enhanced_mvit(video_dir: str):
             break
 
 if __name__ == "__main__":
-    enhanced_mvit("/home/ghoti/FEEL/FEEL/data/small_data/renamed")
+    enhanced_mvit("./data/small_data/renamed")

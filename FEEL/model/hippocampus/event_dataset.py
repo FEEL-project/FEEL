@@ -1,6 +1,7 @@
 import torch
 import numpy as np
 from torch.utils.data import Dataset, DataLoader
+import pickle
 
 class EventDataset(Dataset):
     def __init__(self, ids=None,  data=None, evaluation1s=None, evaluation2s=None, priority=None):
@@ -141,3 +142,17 @@ class EventDataset(Dataset):
         
         # Update the index mapping
         self._update_id_to_index_mapping()
+        
+    def save_to_file(self, file_path):
+        # save EventDataset instance to file_path
+        with open(file_path, 'wb') as file:
+            pickle.dump(self, file)
+    
+    @staticmethod
+    def load_from_file(file_path):
+        # load EventDataset instance from file_path
+        with open(file_path, 'rb') as file:
+            obj = pickle.load(file)
+            if not isinstance(obj, EventDataset):
+                raise ValueError(f"File does not contain an EventDataset instance but a {type(obj)}")
+            return obj
