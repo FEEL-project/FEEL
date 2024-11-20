@@ -1,4 +1,5 @@
 import torch
+from torch.utils.data import DataLoader
 from torchvision.models.video import mvit_v1_b, MViT_V1_B_Weights
 
 from dataset.video_dataset import load_video_dataset
@@ -47,13 +48,21 @@ def seeing(video_dir: str):
     """
     動画を渡して、評価を出力させる
     """
-    batch_size = 1
+    batch_size = 2
     clip_length = 16
     train_loader = load_video_dataset(video_dir, batch_size, clip_length)
-    elaborator = Elaborator()
+    hippocampus_params = { # dimension=768, replay_rate=10, replay_iteration=5, size_episode=3
+        'dimension': 768,
+        'replay_rate': 10,
+        'replay_iteration': 5,
+        'size_episode': 3
+    }
+    elaborator = Elaborator(hippocampus_params=hippocampus_params)
     mvit = EnhancedMViT(pretrained=True)
     elaborator.eval()
     mvit.eval()
+    evaluation2 = torch.tensor([0.0, 0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7]) # 仮の最終感情評価
+    cnt = 0
     for inputs, labels in train_loader:
         print("inputs")
         print(inputs.shape)
@@ -61,19 +70,33 @@ def seeing(video_dir: str):
         print(labels)
         with torch.no_grad():
             c1, c2, outputs = mvit(inputs)
-            event = elaborator.hippocampus.receive(characteristics=c2, evaluation1=labels)
-            # episode = elaborator.hippocampus.generate_episode(event)
+            # print(f"shape of c2: {c2.shape}, shape of labels: {labels.shape}")
+            events = elaborator.hippocampus.receive(characteristics=c2, evaluation1=labels) ### issue: mini-batchに対応していない
+            # print("event")
+            # print(f"length of event['id']: {len(event['id'])}, shape of event['characteristics']: {event['characteristics'].shape},shape of event['evaluation1']: {event['evaluation1'].shape}")
+            if cnt < 10:
+                for i in range(len(events)):
+                    event = events[i]
+                    elaborator.hippocampus.save_to_memory(event=event,
+                                                          evaluation2=evaluation2)
+            else:
+                ### issue: hippocampusに十分な数のeventがないため、episodeが生成されない
+                print(elaborator.hippocampus.num_events)
+                episode = elaborator.hippocampus.generate_episode(events, batch_size=batch_size)
+                print("episode")
+                print(episode)
+                break
+            cnt += batch_size
             pre_eval = elaborator.prefrontal_cortex(c2)
             # pre_eval = elaborator.prefrontal_cortex(episode)
             eval_1 = elaborator.subcortical_pathway(c2)
             eval_2 = elaborator.controller(eval_1, pre_eval)
-            print("pre_eval")
-            print(pre_eval)
-            print("eval_1")
-            print(eval_1)
-            print("eval_2")
-            print(eval_2)
-            break
+            # print("pre_eval")
+            # print(pre_eval)
+            # print("eval_1")
+            # print(eval_1)
+            # print("eval_2")
+            # print(eval_2)
 
 
 if __name__ == "__main__":
