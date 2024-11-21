@@ -8,14 +8,14 @@ from utils import timeit
 
 @timeit
 def main(video_path: str, use_old: bool = False):
-    BATCH_SIZE = 1
+    BATCH_SIZE = 2
     CLIP_LENGTH = 16
     DIM_CHARACTERISTICS = 768
     SIZE_EPISODE = 3
     global DEVICE
     DEVICE = torch.device("cpu") #torch.device("cuda" if torch.cuda.is_available() else "cpu")
     print(DEVICE)
-    train_loader = load_video_dataset(video_path, "annotation/parameters_database.csv", BATCH_SIZE, CLIP_LENGTH)
+    train_loader = load_video_dataset(video_path, "annotation/params_trainval.csv", BATCH_SIZE, CLIP_LENGTH)
     
     model_mvit = EnhancedMViT(pretrained=True).to(device=DEVICE)
     model_pfc = PFC(DIM_CHARACTERISTICS, SIZE_EPISODE, 8).to(device=DEVICE)
@@ -63,16 +63,15 @@ def main(video_path: str, use_old: bool = False):
                 else:
                     episode = model_hippocampus.generate_episodes_batch(events=events)
                 print("episode", episode)
-                return
                 pre_eval = model_pfc(episode.transpose(0, 1))
-                print("pre_eval", pre_eval)
+                print("pre_eval", pre_eval.shape)
                 eval1 = model_subcortical_pathway(characteristics)
-                print("eval1", eval1)
+                print("eval1", eval1.shape)
                 eval2 = model_controller(eval1, pre_eval)
                 print("eval2", eval2)
                 break
             cnt += BATCH_SIZE
 
 if __name__ == "__main__":
-    main("./data/small_data/renamed", use_old=True)
+    main("./data/small_data/trainval", use_old=False)
     # enhanced_mvit("./data/small_data/renamed")

@@ -107,7 +107,7 @@ class VectorDatabase():
             raise ValueError(f"Query vector dimension must be {self.dimension}")
         
         # Search index
-        distances, indices = self.index.search(query_vector.reshape(1, -1), k+1) # +1 to exclude the query vector itself
+        distances, indices = self.index.search(query_vector.reshape(1, -1), k) # +1 to exclude the query vector itself
         
         # Convert to list of (id, distance) tuples
         results = []

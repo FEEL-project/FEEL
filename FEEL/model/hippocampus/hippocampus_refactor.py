@@ -245,6 +245,7 @@ class HippocampusRefactored():
         for i, id in enumerate(associated_id):
             priority = associated_priority[i]
             self.event_dataset.update_priority(id, self.priority_method[1], eval1=priority, rate=0.5)
+        print("episode", [e.shape for e in episode])
         return torch.stack(episode)
     
     def generate_episodes_batch(self, event_ids: Sequence[int] = None, events: Sequence[EventData] = None, characteristics: Sequence[torch.Tensor] = None, batch_size: int = None):
