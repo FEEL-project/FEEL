@@ -28,6 +28,7 @@ class Elaborator(nn.Module):
             self.hippocampus = Hippocampus(dimension=params['dimension'],
                                            replay_rate=params['replay_rate'],
                                            size_episode=params['size_episode'],
+                                           minimal_to_generate=params['minimal_to_generate'],
                                            minimal_to_replay=params['minimal_to_replay'],
                                            minimal_to_loss=params['minimal_to_loss'],
                                            replay_batch_size=params['replay_batch_size'],

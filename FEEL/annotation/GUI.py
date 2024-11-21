@@ -4,8 +4,13 @@ from pathlib import Path
 import os
 
 # 保存先のデータベース（CSVファイル）の初期化
-DATABASE_FILE = "/home/u01230/SoccerNarration/FEEL/annotation/params_trainval.csv"
-VIDEO_DIR = "/home/u01230/SoccerNarration/FEEL/data/EmVidCap/Videos/EmVidCap-L/TrainVal_clips/splitted_TrainVal"
+# EmVidCapの場合
+# DATABASE_FILE = "../params_trainval.csv"
+# VIDEO_DIR = "../data/EmVidCap/Videos/EmVidCap-L/TrainVal_clips/splitted_TrainVal"
+
+# joeの場合
+DATABASE_FILE = "/home/u01231/project_body/FEEL/annotation/joe/params_trainval.csv"
+VIDEO_DIR = "/home/u01231/project_body/FEEL/data/youtube_movies/joe/splitted/trainval"
 
 if not Path(DATABASE_FILE).exists():
     pd.DataFrame(columns=["video", "joy", "trust", "fear", "surprise", "sadness", "disgust", "anger", "anticipation"]).to_csv(
@@ -15,6 +20,7 @@ if not Path(DATABASE_FILE).exists():
 # 動画ディレクトリと動画リストの準備
 video_dir_path = Path(VIDEO_DIR)
 video_files = sorted(video_dir_path.glob("*.mp4"))  # 動画ファイルリスト
+# print(f"Number of videos: {len(video_files)}, #1: {video_files[0]}")
 
 
 # 未処理の動画を取得する関数

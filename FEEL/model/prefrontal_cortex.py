@@ -24,7 +24,10 @@ class PFCPositionalEncoding(nn.Module):
         Returns:
             torch.Tensor: Returns Positional-encoded Tensor
         """
+        print(f"PFCPositionalEncoding: x.shape={x.shape}, \nvalue={x}")
+        print(f"PFCPositionalEncoding: pe.shape={self.pe[:x.size(0)].shape}, \nvalue={self.pe[:x.size(0)]}")
         x = x + self.pe[:x.size(0)]
+        print(f"PFCPositionalEncoding: x+pe.shape={x.shape}, \nvalue={x}")
         return self.dropout(x)
 
 class PFC(nn.Module):
@@ -47,8 +50,8 @@ class PFC(nn.Module):
         """PFC
 
         Args:
-            dim_event (int, optional): Number of dimension in an episode. Defaults to 768.
-            size_episode (int, optional): Number of episodes replayed. Defaults to 5.
+            dim_event (int, optional): Number of dimension of an event. Defaults to 768.
+            size_episode (int, optional): Number of events in an episode. Defaults to 5.
             dim_out (int, optional): Output dimension of emotion. Defaults to 8.
             nhead (int, optional): Number of heads. Defaults to 8.
             dim_feedforward (int, optional): Dimension to feed forward. Defaults to 2048.
