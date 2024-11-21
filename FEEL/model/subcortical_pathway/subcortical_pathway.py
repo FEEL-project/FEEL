@@ -1,8 +1,6 @@
 import torch
 import torch.nn as nn
 
-torch.autograd.set_detect_anomaly(True) #FIXME: Remove this line
-
 class SubcorticalPathway(nn.Module):
     """
     扁桃体: 粗い情報をもとに、速い経路(Subcortical Pathway)で threat-neutral-reward の判断を行う 

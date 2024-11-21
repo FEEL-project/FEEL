@@ -6,8 +6,6 @@ import pandas as pd
 import numpy as np
 from functools import wraps
 
-torch.autograd.set_detect_anomaly(True) #FIXME: Remove this line
-
 T = TypeVar("T")
 
 @dataclass

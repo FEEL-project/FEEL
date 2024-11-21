@@ -9,8 +9,6 @@ import json
 
 from .database import VectorDatabase
 from .event_dataset_refactor import EventDataset, EventData, event_data
-
-torch.autograd.set_detect_anomaly(True) #FIXME: Remove this line
 class Counter():
     """A class representing a counter
     """
