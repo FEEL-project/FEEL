@@ -5,18 +5,18 @@ import pickle
 from typing import Literal
 
 class EventDataset(Dataset):
-    def __init__(self, ids=None,  data=None, evaluation1s=None, evaluation2s=None, priority=None):
+    def __init__(self, ids=None,  characteristics=None, evaluation1s=None, evaluation2s=None, priority=None):
         # Initialize with empty lists if no data provided
-        self.ids = np.array(ids) if ids is not None else np.empty((0,), dtype=object)
-        self.data = np.array(data) if data is not None else np.empty((0,), dtype=object)
-        self.evaluation1s = np.array(evaluation1s) if evaluation1s is not None else np.empty((0,), dtype=object)
-        self.evaluation2s = np.array(evaluation2s) if evaluation2s is not None else np.empty((0,), dtype=object)
-        self.priority = np.array(priority) if priority is not None else np.empty((0,), dtype=object)
+        self.ids = ids if ids is not None else []
+        self.characteristics = characteristics if characteristics is not None else []
+        self.evaluation1s = evaluation1s if evaluation1s is not None else []
+        self.evaluation2s = evaluation2s if evaluation2s is not None else []
+        self.priority = priority if priority is not None else []
         self._id_to_index = None
         
         # Validate input consistency
-        if not (len(self.data) == len(self.ids) == len(self.evaluation1s) == len(self.evaluation2s) == len(self.priority)):
-            raise ValueError("Data, IDs, and evaluations, priority must have the same length")
+        if not (len(self.characteristics) == len(self.ids) == len(self.evaluation1s) == len(self.evaluation2s) == len(self.priority)):
+            raise ValueError("characteristics, IDs, and evaluations, priority must have the same length")
         
         # Initialize id to index mapping
         self._update_id_to_index_mapping()
@@ -25,16 +25,21 @@ class EventDataset(Dataset):
         return len(self.ids)
 
     def __getitem__(self, idx):
+        # print(f"self.ids[idx]:{self.ids[idx]}")
+        # print(f"self.characteristics[idx]:{self.characteristics[idx]}")
+        # print(f"self.evaluation1s[idx]:{self.evaluation1s[idx]}")
+        # print(f"self.evaluation2s[idx]:{self.evaluation2s[idx]}")
+        # print("size:", len(self.ids), len(self.characteristics), len(self.evaluation1s), len(self.evaluation2s))
         return {
             'id': self.ids[idx], 
-            'data': torch.from_numpy(self.data[idx]).float(),
-            'evaluation1': torch.from_numpy(self.evaluation1s[idx]).float(),
-            'evaluation2': torch.from_numpy(self.evaluation2s[idx]).float()
+            'characteristics': torch.tensor(self.characteristics[idx]).float(),
+            'evaluation1': torch.tensor(self.evaluation1s[idx]).float(),
+            'evaluation2': torch.tensor(self.evaluation2s[idx]).float()
         }
         
     def get_priority(self) -> torch.Tensor:
         #  Return the priority array as a tensor
-        return torch.from_numpy(self.priority).float()
+        return torch.tensor(self.priority).float()
 
     def _update_id_to_index_mapping(self):
         # Rebuild the id to index mapping (for thread safety)
@@ -44,27 +49,27 @@ class EventDataset(Dataset):
 
     def get_by_id(self, id_value):
         # {'id': self.ids[idx], 
-        #  'data': torch.from_numpy(self.data[idx]).float(), 
+        #  'characteristics': torch.from_numpy(self.characteristics[idx]).float(), 
         #  'evaluation': torch.from_numpy(self.evaluations[idx]).float()
         # }
         index = self._id_to_index.get(id_value)
         return self[index] if index is not None else None
 
-    def add_item(self, new_id, new_data, new_evaluation1, new_evaluation2, new_priority):
-        # Ensure new_data is a numpy array
-        if not isinstance(new_data, np.ndarray):
-            new_data = np.array(new_data)
+    def add_item(self, new_id, new_characteristics, new_evaluation1, new_evaluation2, new_priority):
+        # Ensure new_characteristics has the same shape as the existing characteristics[0]
+        if len(self.characteristics) > 0 and new_characteristics.shape != self.characteristics[0].shape:
+            raise ValueError(f"characteristics shape {new_characteristics.shape} does not match existing characteristics shape {self.characteristics[0].shape}")
         
         # Check for duplicate ID
         if new_id in self._id_to_index:
             raise ValueError(f"ID {new_id} already exists in the dataset")
         
-        # Append new data and ID
-        self.ids = np.append(self.ids, new_id)
-        self.data = np.append(self.data, new_data)
-        self.evaluation1s = np.append(self.evaluation1s, new_evaluation1)
-        self.evaluation2s = np.append(self.evaluation2s, new_evaluation2)
-        self.priority = np.append(self.priority, new_priority)
+        # Append new characteristics and ID
+        self.ids.append(new_id)
+        self.characteristics.append(new_characteristics)
+        self.evaluation1s.append(new_evaluation1)
+        self.evaluation2s.append(new_evaluation2)
+        self.priority.append(new_priority)
         
         # Update the index mapping
         self._update_id_to_index_mapping()
@@ -77,11 +82,11 @@ class EventDataset(Dataset):
             raise ValueError(f"ID {id_to_remove} not found in the dataset")
         
         # Remove the item at the found index
-        self.data = np.delete(self.data, index)
-        self.ids = np.delete(self.ids, index)
-        self.evaluation1s = np.delete(self.evaluation1s, index)
-        self.evaluation2s = np.delete(self.evaluation2s, index)
-        self.priority = np.delete(self.priority, index)
+        del self.characteristics[index] # self.characteristics = np.delete(self.characteristics, index)
+        del self.ids[index] # self.ids = np.delete(self.ids, index)
+        del self.evaluation1s[index] # self.evaluation1s = np.delete(self.evaluation1s, index)
+        del self.evaluation2s[index] # self.evaluation2s = np.delete(self.evaluation2s, index)
+        del self.priority[index] # self.priority = np.delete(self.priority, index)
         
         # Rebuild the index mapping
         self._update_id_to_index_mapping()
@@ -99,22 +104,22 @@ class EventDataset(Dataset):
             raise ValueError(f"Invalid method: {method}")
         ### アルゴリズムは追加可能
 
-    def bulk_add_items(self, new_data_list, new_ids, new_evaluation1s, new_evaluation2s, new_priority):
+    def bulk_add_items(self, new_characteristics_list, new_ids, new_evaluation1s, new_evaluation2s, new_priority):
         # Validate input lengths match
-        if not (len(new_data_list) == len(new_ids) == len(new_evaluation1s)):
-            raise ValueError("Number of data items must match number of IDs")
+        if not (len(new_characteristics_list) == len(new_ids) == len(new_evaluation1s)):
+            raise ValueError("Number of characteristics items must match number of IDs")
         
         # Check for duplicate IDs
         duplicate_ids = set(new_ids) & set(self.ids)
         if duplicate_ids:
             raise ValueError(f"Duplicate IDs found: {duplicate_ids}")
         
-        # Append new data and IDs
-        self.data = np.append(self.data, new_data_list)
-        self.ids = np.append(self.ids, new_ids)
-        self.evaluation1s = np.append(self.evaluation1s, new_evaluation1s)
-        self.evaluation2s = np.append(self.evaluation2s, new_evaluation2s)
-        self.priority = np.append(self.priority, new_priority)
+        # Append new characteristics and IDs
+        self.characteristics.extend(new_characteristics_list)
+        self.ids.extend(new_ids)
+        self.evaluation1s.extend(new_evaluation1s)
+        self.evaluation2s.extend(new_evaluation2s)
+        self.priority.extend(new_priority)
         
         # Update the index mapping
         self._update_id_to_index_mapping()
@@ -135,11 +140,11 @@ class EventDataset(Dataset):
         
         # Remove items at specified indices
         for idx in indices_to_remove:
-            self.data = np.delete(self.data, idx)
-            self.ids = np.delete(self.ids, idx)
-            self.evaluation1s = np.delete(self.evaluation1s, idx)
-            self.evaluation2s = np.delete(self.evaluation2s, idx)
-            self.priority = np.delete(self.priority, idx)
+            del self.characteristics[idx] # self.characteristics = np.delete(self.characteristics, idx)
+            del self.ids[idx] # self.ids = np.delete(self.ids, idx)
+            del self.evaluation1s[idx] # self.evaluation1s = np.delete(self.evaluation1s, idx)
+            del self.evaluation2s[idx] # self.evaluation2s = np.delete(self.evaluation2s, idx)
+            del self.priority[idx] # self.priority = np.delete(self.priority, idx)
         
         # Update the index mapping
         self._update_id_to_index_mapping()
