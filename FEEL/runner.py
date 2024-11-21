@@ -48,13 +48,14 @@ def seeing(video_dir: str, debug=False):
     """
     動画を渡して、評価を出力させる
     """
-    batch_size = 2
+    batch_size = 4
     clip_length = 16
     train_loader = load_video_dataset(video_dir, batch_size, clip_length)
     params = { # dimension=768, replay_rate=10, replay_iteration=5, size_episode=3
         'dimension': 768,       # dimension of characteristics
         'replay_rate': 10,          # how often to replay during training
         'size_episode': 3,          # size of episode
+        'minimal_to_generate': 8, # minimal number of events to start generating episode
         'minimal_to_replay': 10,    # minimal number of events to start replay
         'minimal_to_loss': 100,     # minimal number of events to start memory loss
         'replay_batch_size': 5,     # batch_size at replay
@@ -69,6 +70,7 @@ def seeing(video_dir: str, debug=False):
     
     # Hippocampusに記憶を保存しながら、評価を出力
     for inputs, labels in train_loader:
+        print(f">>batch #{cnt}")
         if debug:
             print(f"shape of inputs: {inputs.shape}, shape of labels: {labels.shape}")
             print(f"value of labels: {labels}")
@@ -85,9 +87,7 @@ def seeing(video_dir: str, debug=False):
                     print(f"event_id: {event['id']}, shape of characteristics: {event['characteristics'].shape}, shape of evaluation1: {event['evaluation1'].shape}")
                 elaborator.hippocampus.save_to_memory(event=event,
                                                         evaluation2=evaluation2)
-            if cnt < 10:
-                pre_eval = elaborator.prefrontal_cortex(c2)
-            else:
+            if cnt >= params['minimal_to_generate']:
                 if debug:
                     print(elaborator.hippocampus.num_events)
                 if len(events) < batch_size:
@@ -97,13 +97,13 @@ def seeing(video_dir: str, debug=False):
                 print(episode)
                 pre_eval = elaborator.prefrontal_cortex(episode)
                 # break
+                eval_2 = elaborator.controller(eval_1, pre_eval)
+                if debug:
+                    print(f"pre_eval: {pre_eval}")
+                    print(f"eval_1: {eval_1}")
+                    print(f"eval_2: {eval_2}")
+                print("==============================")
             cnt += batch_size
-            eval_2 = elaborator.controller(eval_1, pre_eval)
-            if debug:
-                print(f"pre_eval: {pre_eval}")
-                print(f"eval_1: {eval_1}")
-                print(f"eval_2: {eval_2}")
-            print("==============================")
     
     # Hippocampusが記憶したイベントを取り出して、評価を出力する
     replay_batch_size = params['replay_batch_size']
@@ -114,6 +114,8 @@ def seeing(video_dir: str, debug=False):
         if len(events) != replay_batch_size:
             raise ValueError(f"size of events ({len(events)}) is not equal to batch_size ({replay_batch_size})")
         episode = elaborator.hippocampus.generate_episode(events, batch_size=replay_batch_size)
+        if debug:
+            print(f"size of events: {len(events)}, shape of episode: {episode.shape}")
         pre_eval = elaborator.prefrontal_cortex(episode)
         eval_2 = elaborator.controller(eval_1, pre_eval)
         print(f"pre_eval: {pre_eval}")
