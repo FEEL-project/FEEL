@@ -8,7 +8,7 @@ import os
 import json
 
 from .database import VectorDatabase
-from .event_dataset_refactor import EventDataset, EventData, parse_event_data, compress0d
+from .event_dataset_refactor import EventDataset, EventData
 
 class Counter():
     """A class representing a counter
@@ -24,7 +24,7 @@ class Counter():
         self.i += 1
         return self.i
 
-class Hippocampus():
+class HippocampusRefactored():
     """A class representing the hippocampus of the brain
     - Memory loss occurs when replayed
     """
@@ -115,7 +115,7 @@ class Hippocampus():
     
     def init_priority(self, event_id: int, eval1: torch.Tensor|float, method: Literal["base"] = "base"):
         if method == "base":
-            return compress0d(eval1) + self.base_priority
+            return torch.abs(eval1) + self.base_priority
         else:
             raise NotImplementedError(f"Method {method} for Hippocampus.init_priority() is not defined.")
     
@@ -308,10 +308,7 @@ class Hippocampus():
             raise TypeError(f"Wrong size of eval1: expected ({batch_size}), got {eval1.size()}")
         events = []
         for i in range(batch_size):
-            characteristics_i = characteristics[i]
-            eval1_i = eval1[i].item()
-            event_id = next(self.id_generator)
-            events.append(EventData(event_id, characteristics_i, eval1_i, None, None))
+            events.append(EventData(next(self.id_generator), characteristics[i], eval1[i], None, None))
         return events
     
     def save_to_memory(

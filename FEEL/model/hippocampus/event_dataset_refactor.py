@@ -8,37 +8,15 @@ from functools import wraps
 
 T = TypeVar("T")
 
-def compress0d(obj_: int|float|list|torch.Tensor|np.ndarray) -> int|float:
-    """Compresses 1-element list-like object (ndarray, Tensor, list) to scalar
-
-    Args:
-        obj_ (int | float | list | torch.Tensor | np.ndarray): Object to compress
-
-    Raises:
-        ValueError: If obj_ cannot be compressed
-
-    Returns:
-        int|float: Compressed scalar
-    """
-    if isinstance(obj_, int|float):
-        return obj_
-    elif isinstance(obj_, list):
-        if len(obj_) == 1:
-            return compress0d(obj_[0])
-        else:
-            raise ValueError(f"Invalid length {len(obj_)}")
-    elif isinstance(obj_, torch.Tensor|np.ndarray):
-        return obj_.item()
-
 @dataclass
 class EventData:
     """A simple wrapper for data acquired by EventDataset
     """
     id: int
     characteristics: torch.Tensor
-    eval1: float
+    eval1: torch.Tensor
     eval2: torch.Tensor
-    priority: float
+    priority: torch.Tensor
 
 def _parse_event_data(fn: Callable[T, Tuple[int, torch.Tensor, float, torch.Tensor, float]]) -> Callable[T, EventData]:
     @wraps(fn)
@@ -61,10 +39,10 @@ class EventDataset(Dataset):
     """Dataset class for storing memory
 
     Args:
-        data (torch.Tensor): Characteristic of event (video)
-        eval1 (float): Intuitive emotional response
+        characterstics (torch.Tensor): Characteristic of event (video)
+        eval1 (torch.Tensor): Intuitive emotional response
         eval2 (torch.Tensor): Emotional response handled in Prefrontal Cortex
-        priority (float): Priority
+        priority (torch.Tensor): Priority
     """
     _df: pd.DataFrame
     
@@ -99,13 +77,13 @@ class EventDataset(Dataset):
         Returns:
             torch.Tensor: Tensor containing priority of shape [len(dataset)]
         """
-        return self._df["priority"].tolist()
+        return self._df["priority"].apply(lambda tensor: tensor.item()).tolist()
     
     def has_id(self, id: int) -> bool:
         return id in self._df.index
     
     # @parse_event_data
-    def get_by_id(self, id: int) -> Tuple[int, torch.Tensor, float, torch.Tensor, float]:
+    def get_by_id(self, id: int) -> Tuple[int, torch.Tensor, torch.Tensor, torch.Tensor, torch.Tensor]:
         """Gets data from unique id
 
         Args:
@@ -115,7 +93,7 @@ class EventDataset(Dataset):
             ValueError: If id does not exist
         
         Returns:
-            Tuple[int, torch.Tensor, float, torch.Tensor, float]: id, characteristics, eval1, eval2, priority
+            Tuple[int, torch.Tensor, torch.Tensor, torch.Tensor, torch.Tensor]: id, characteristics, eval1, eval2, priority
         """
         if not self.has_id(id):
             raise ValueError(f"Data with id {id} does not exist")
@@ -146,11 +124,9 @@ class EventDataset(Dataset):
             priority (Any): Priority, either in float, Tensor or ndarray
         """
         assert not self.has_id(id), ValueError(f"Data with id {id} already exists")
-        eval1 = compress0d(eval1)
-        priority = compress0d(priority)
         self._df.loc[id] = {"characteristics": characteristics, "eval1": eval1, "eval2": eval2, "priority": priority}
     
-    def update_priority(self, id: int, method: Literal["rate", "replace"], eval1: float, rate: float=1.0) -> None:
+    def update_priority(self, id: int, method: Literal["rate", "replace"], eval1: torch.Tensor, rate: float=1.0) -> None:
         assert self.has_id(id), f"Data with id {id} does not exist"
         if method == "rate":
             self._df.at[id, "priority"] += rate * self._df.at[id, "eval1"]
@@ -176,9 +152,9 @@ class EventDataset(Dataset):
     
     def _cast_type(self) -> None:
         self._df["characteristics"] = self._df["characteristics"].astype(object).apply(torch.Tensor)
-        self._df["eval1"] = self._df["eval1"].apply(compress0d).astype(float)
+        self._df["eval1"] = self._df["eval1"].astype(object).apply(torch.Tensor)
         self._df["eval2"] = self._df["eval2"].astype(object).apply(torch.Tensor)
-        self._df["priority"] = self._df["priority"].apply(compress0d).astype(float)
+        self._df["priority"] = self._df["priority"].astype(object).apply(torch.Tensor)
     
     @classmethod
     def load_from_file(cls, file_path: str) -> "EventDataset":

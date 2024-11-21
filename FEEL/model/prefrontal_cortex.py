@@ -54,6 +54,8 @@ class PFC(nn.Module):
             dim_feedforward (int, optional): Dimension to feed forward. Defaults to 2048.
             num_encoder_layers (int, optional): Number of encoded layer. Defaults to 6.
         """
+        self.num_events = num_events
+        self.dim_event = dim_event
         super(PFC, self).__init__()
         
         self.conv = nn.Linear(dim_event, d_model)
@@ -73,18 +75,17 @@ class PFC(nn.Module):
         """forward
 
         Args:
-            src (torch.Tensor): Input episode batch with shape [seq_len, batch_size, embedding_dim]
+            src (torch.Tensor): Input episode batch with shape [num_events, batch_size, dim_event]
 
         Returns:
             torch.Tensor: Output tensor [dim_out]
         """
+        if not (src.size(0) == self.num_events and src.size(2) == self.dim_event):
+            raise ValueError(f"Input shape must be (num_events, batch_size, dim_event) = [{self.num_events}, *, {self.dim_event}], got {src.shape}")
         src = self.conv(src)
-        print(81, src.shape)
         src = self.positional_encoding(src)
-        print(83, src.shape)
         # Pass through the Transformer Encoder
         encoded_output: torch.Tensor = self.encoder(src)
-        print(86, src.shape)
         # Pool the output
         pooled_output = encoded_output.mean(dim=0)
         
