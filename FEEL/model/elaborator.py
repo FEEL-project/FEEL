@@ -83,7 +83,7 @@ class Elaborator(nn.Module):
         self.prefrontal_cortex.eval()
         self.controller.eval()
         total_loss = 0
-        for i in range(self.hippocampus.num_events):
+        for i in range(self.hippocampus.num_events): #FIXME: Probably fails when there is a deleted memory
             event = self.hippocampus.get_event(i)
             eval_1 = event["eval_1"]
             episode = self.hippocampus.generate_episode(event)

@@ -2,6 +2,7 @@ import torch
 import numpy as np
 from torch.utils.data import Dataset, DataLoader
 import pickle
+from typing import Literal
 
 class EventDataset(Dataset):
     def __init__(self, ids=None,  characteristics=None, evaluation1s=None, evaluation2s=None, priority=None):
@@ -94,7 +95,7 @@ class EventDataset(Dataset):
         # Rebuild the index mapping
         self._update_id_to_index_mapping()
         
-    def update_priority(self, id_value:int, method:str, evaluation2=None, rate=1.0):
+    def update_priority(self, id_value:int, method:Literal["rate", "replace"], evaluation2=None, rate=1.0):
         """update the priority of an item by ID"""
         index = self._id_to_index.get(id_value)
         if index is None:
