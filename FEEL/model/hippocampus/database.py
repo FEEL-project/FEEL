@@ -1,4 +1,5 @@
 import os
+import pickle
 import numpy as np
 import faiss
 from typing import List, Tuple, Optional
@@ -94,7 +95,7 @@ class VectorDatabase():
             
             return True
     
-    def search(self, query_vector: np.ndarray, k: int = 5) -> List[Tuple[int, float]]:
+    def search(self, query_vector: np.ndarray, k: int = 5, id: int=-1) -> List[Tuple[int, float]]:
         """
         Search for k nearest neighbors.
         Returns list of (id, distance) tuples.
@@ -106,12 +107,15 @@ class VectorDatabase():
             raise ValueError(f"Query vector dimension must be {self.dimension}")
         
         # Search index
-        distances, indices = self.index.search(query_vector.reshape(1, -1), k)
+        distances, indices = self.index.search(query_vector.reshape(1, -1), k+1) # +1 to exclude the query vector itself
         
         # Convert to list of (id, distance) tuples
         results = []
         for dist, idx in zip(distances[0], indices[0]):
             if idx != -1:  # -1 indicates no result found
+                # Skip the query vector itself
+                if id != -1 and self.id_map[idx] == id:
+                    continue
                 results.append((self.id_map[idx], float(dist)))
         
         return results

@@ -25,6 +25,7 @@ class EventDataset(Dataset):
         return len(self.ids)
 
     def __getitem__(self, idx):
+        """return a single item by index"""
         # print(f"self.ids[idx]:{self.ids[idx]}")
         # print(f"self.characteristics[idx]:{self.characteristics[idx]}")
         # print(f"self.evaluation1s[idx]:{self.evaluation1s[idx]}")
@@ -48,6 +49,7 @@ class EventDataset(Dataset):
         self._id_to_index = {id_val: idx for idx, id_val in enumerate(self.ids)}
 
     def get_by_id(self, id_value):
+        """Return an item by ID"""
         # {'id': self.ids[idx], 
         #  'characteristics': torch.from_numpy(self.characteristics[idx]).float(), 
         #  'evaluation': torch.from_numpy(self.evaluations[idx]).float()
@@ -55,7 +57,8 @@ class EventDataset(Dataset):
         index = self._id_to_index.get(id_value)
         return self[index] if index is not None else None
 
-    def add_item(self, new_id, new_characteristics, new_evaluation1, new_evaluation2, new_priority):
+    def add_item(self, new_id:int, new_characteristics: torch.Tensor, new_evaluation1: torch.Tensor, new_evaluation2: torch.Tensor, new_priority):
+        """Add a single item to the dataset"""
         # Ensure new_characteristics has the same shape as the existing characteristics[0]
         if len(self.characteristics) > 0 and new_characteristics.shape != self.characteristics[0].shape:
             raise ValueError(f"characteristics shape {new_characteristics.shape} does not match existing characteristics shape {self.characteristics[0].shape}")
@@ -75,6 +78,7 @@ class EventDataset(Dataset):
         self._update_id_to_index_mapping()
 
     def remove_by_id(self, id_to_remove):
+        """Remove an item from the dataset by ID"""
         # Find the index of the ID to remove
         index = self._id_to_index.get(id_to_remove)
         
@@ -91,13 +95,16 @@ class EventDataset(Dataset):
         # Rebuild the index mapping
         self._update_id_to_index_mapping()
         
-    def update_priority(self, id_value, method:Literal["rate", "replace"], evaluation2=None, rate=1.0):
+    def update_priority(self, id_value:int, method:Literal["rate", "replace"], evaluation2=None, rate=1.0):
+        """update the priority of an item by ID"""
         index = self._id_to_index.get(id_value)
         if index is None:
-            raise ValueError(f"ID {id_value} not found in the dataset")
+            print(f"EventDataset: {self._id_to_index}")
+            raise ValueError(f"ID {id_value} (index {index}) not found in the dataset")
         ### issue: 要検討(アルゴリズム)
         if method == 'rate':
-            self.priority[index] += rate * self.evaluation2s[index]
+            """8次元の評価値をノルムにして、rateをかけてpriorityに加算"""
+            self.priority[index] += rate * torch.norm(self.evaluation2s[index])
         elif method == 'replace':
             self.priority[index] = evaluation2
         else:
@@ -105,6 +112,7 @@ class EventDataset(Dataset):
         ### アルゴリズムは追加可能
 
     def bulk_add_items(self, new_characteristics_list, new_ids, new_evaluation1s, new_evaluation2s, new_priority):
+        """Add multiple items to the dataset"""
         # Validate input lengths match
         if not (len(new_characteristics_list) == len(new_ids) == len(new_evaluation1s)):
             raise ValueError("Number of characteristics items must match number of IDs")
@@ -125,6 +133,7 @@ class EventDataset(Dataset):
         self._update_id_to_index_mapping()
     
     def bulk_delete_items(self, ids_to_remove):
+        """Remove multiple items from the dataset by ID"""
         # Validate input
         if not ids_to_remove:
             return

@@ -4,13 +4,13 @@ import math
 
 
 class PFCPositionalEncoding(nn.Module):
-    def __init__(self, dim_event: int = 768, num_events:int = 5, dropout: float=0.1):
+    def __init__(self, dim_event: int = 768, size_episode:int = 5, dropout: float=0.1):
         super().__init__()
         self.dropout = nn.Dropout(p=dropout)
 
-        position = torch.arange(num_events).unsqueeze(1)
+        position = torch.arange(size_episode).unsqueeze(1)
         div_term = torch.exp(torch.arange(0, dim_event, 2).float() * (-math.log(10000.0) / dim_event))
-        pe = torch.zeros(num_events, 1, dim_event)
+        pe = torch.zeros(size_episode, 1, dim_event)
         pe[:, 0, 0::2] = torch.sin(position * div_term)
         pe[:, 0, 1::2] = torch.cos(position * div_term)
         self.register_buffer('pe', pe)
@@ -37,7 +37,7 @@ class PFC(nn.Module):
     def __init__(
         self,
         dim_event:int = 768,
-        num_events: int = 5,
+        size_episode: int = 5,
         dim_out: int = 8,
         d_model: int = 512,
         nhead: int = 8,
@@ -48,7 +48,7 @@ class PFC(nn.Module):
 
         Args:
             dim_event (int, optional): Number of dimension in an episode. Defaults to 768.
-            num_events (int, optional): Number of episodes replayed. Defaults to 5.
+            size_episode (int, optional): Number of episodes replayed. Defaults to 5.
             dim_out (int, optional): Output dimension of emotion. Defaults to 8.
             nhead (int, optional): Number of heads. Defaults to 8.
             dim_feedforward (int, optional): Dimension to feed forward. Defaults to 2048.
@@ -60,7 +60,7 @@ class PFC(nn.Module):
         
         self.conv = nn.Linear(dim_event, d_model)
         
-        self.positional_encoding = PFCPositionalEncoding(d_model, num_events)
+        self.positional_encoding = PFCPositionalEncoding(d_model, size_episode)
         
         encoder_layer = nn.TransformerEncoderLayer(
             d_model=d_model,
@@ -87,7 +87,7 @@ class PFC(nn.Module):
         # Pass through the Transformer Encoder
         encoded_output: torch.Tensor = self.encoder(src)
         # Pool the output
-        pooled_output = encoded_output.mean(dim=0)
+        pooled_output = encoded_output.mean(dim=1)
         
         #Pass through classification head
         return self.classifier(pooled_output)

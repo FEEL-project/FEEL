@@ -16,7 +16,7 @@ class Elaborator(nn.Module):
                  pretrained_subcortical_pathway: str = None,       # path to pretrained amygdala (pth)
                  pretrained_controller: str = None,  # path to pretrained controller (pth)
                  pretrained_prefrontal_cortex: str = None,  # path to pretrained prefrontal cortex (pth)
-                 hippocampus_params: dict = None, # parameters for hippocampus
+                 params: dict = None, # parameters for hippocampus
                  ):
         super(Elaborator, self).__init__()
         self.sensory_cortex = EnhancedMViT()
@@ -25,11 +25,14 @@ class Elaborator(nn.Module):
         if pretrained_hippocampus is not None:
             self.hippocampus = Hippocampus.load_from_file(pretrained_hippocampus)
         else:
-            self.hippocampus = Hippocampus(hippocampus_params['dimension'],
-                                           hippocampus_params['size_episode'],
-                                           hippocampus_params['replay_rate'],
-                                           hippocampus_params['replay_iteration'],)
-        self.prefrontal_cortex = PFC()
+            self.hippocampus = Hippocampus(dimension=params['dimension'],
+                                           replay_rate=params['replay_rate'],
+                                           size_episode=params['size_episode'],
+                                           minimal_to_replay=params['minimal_to_replay'],
+                                           minimal_to_loss=params['minimal_to_loss'],
+                                           replay_batch_size=params['replay_batch_size'],
+                                           replay_iteration=params['replay_iteration'])
+        self.prefrontal_cortex = PFC(size_episode=params['size_episode'])
         if pretrained_sensory_cortex is not None:
             self.sensory_cortex.load_state_dict(torch.load(pretrained_sensory_cortex))
         self.subcortical_pathway = SubcorticalPathway()
