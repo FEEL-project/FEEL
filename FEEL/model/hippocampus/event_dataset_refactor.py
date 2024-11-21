@@ -27,13 +27,13 @@ def _parse_event_data(fn: Callable[T, Tuple[int, torch.Tensor, float, torch.Tens
         return None
     return wrapper
 
-def parse_event_data(obj_: Any) -> EventData:
+def event_data(obj_: Any) -> EventData:
     if isinstance(obj_, tuple):
         return EventData(*obj_)
     elif isinstance(obj_, EventData):
         return obj_
     else:
-        raise TypeError(f"Unsupported type {type(obj_)} for parse_event_data()")
+        raise TypeError(f"Unsupported type {type(obj_)} for event_data()")
 
 class EventDataset(Dataset):
     """Dataset class for storing memory
@@ -129,7 +129,7 @@ class EventDataset(Dataset):
     def update_priority(self, id: int, method: Literal["rate", "replace"], eval1: torch.Tensor, rate: float=1.0) -> None:
         assert self.has_id(id), f"Data with id {id} does not exist"
         if method == "rate":
-            self._df.at[id, "priority"] += rate * self._df.at[id, "eval1"]
+            self._df.at[id, "priority"] += rate * torch.norm(self._df.at[id, "eval2"])
         elif method == "replace":
             self._df.at[id, "priority"] = eval1
         else:

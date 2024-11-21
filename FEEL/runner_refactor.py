@@ -15,7 +15,7 @@ def main(video_path: str, use_old: bool = False):
     global DEVICE
     DEVICE = torch.device("cpu") #torch.device("cuda" if torch.cuda.is_available() else "cpu")
     print(DEVICE)
-    train_loader = load_video_dataset(video_path, BATCH_SIZE, CLIP_LENGTH)
+    train_loader = load_video_dataset(video_path, "annotation/parameters_database.csv", BATCH_SIZE, CLIP_LENGTH)
     
     model_mvit = EnhancedMViT(pretrained=True).to(device=DEVICE)
     model_pfc = PFC(DIM_CHARACTERISTICS, SIZE_EPISODE, 8).to(device=DEVICE)

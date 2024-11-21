@@ -8,7 +8,7 @@ import os
 import json
 
 from .database import VectorDatabase
-from .event_dataset_refactor import EventDataset, EventData
+from .event_dataset_refactor import EventDataset, EventData, event_data
 
 class Counter():
     """A class representing a counter
@@ -119,11 +119,13 @@ class HippocampusRefactored():
         else:
             raise NotImplementedError(f"Method {method} for Hippocampus.init_priority() is not defined.")
     
-    def update_priority(self, event_id: int, new_eval: torch.Tensor, method: Literal["rate", "replace"] = "rate", rate: float = 1.0):
+    def update_priority(self, event_id: int, method: Literal["rate", "replace"] = "rate", new_eval2: torch.Tensor = None, rate: float = 1.0):
+        if method == "replace" and new_eval2 is None:
+            raise ValueError("new_eval2 must be provided when method is replace")
         self.event_dataset.update_priority(
             id=event_id,
             method=method,
-            eval2=new_eval,
+            eval2=new_eval2 if method=="replace" else None,
             rate=rate
         )
     
@@ -187,7 +189,7 @@ class HippocampusRefactored():
             memories_removed.append(id_removed)
             self.stm.remove(id_removed)
     
-    def replay(self, batch_size: int = 1):
+    def replay(self, batch_size: int = 1) -> EventData:
         """Replays memory
         1. Samples events from meory and outputs it according to the time of memory and impact
         2. Delete samples if necessary
@@ -196,15 +198,16 @@ class HippocampusRefactored():
             batch_size (int, optional): Batch size. Defaults to 1.
         """
         events = self.sample(batch_size)
-        assert events is not None, "No events to replay"
-        ids = events[0]
+        if events is None:
+            raise ValueError("Not enough events to replay")
+        ids, characteristics, eval1s, eval2s, _ = events
         # Refresh priority
-        for event_id in ids:
-            self.event_dataset.update_priority(event_id, self.priority_method[1])
+        for i, event_id in enumerate(ids):
+            self.event_dataset.update_priority(event_id, self.priority_method[1], eval1=eval1s[i])
             self.times_replayed += 1
-            if self.times_replayed % self.loss_freq == 0:
+            if self.times_replayed % self.loss_freq == 0 or len(self) > self.max_len_dataset:
                 self.organize_memory()
-        return events
+        return event_data(events)
     
     def generate_episode(self, event_id: int = None, event: EventData = None, characteristics: torch.Tensor = None) -> torch.Tensor:
         """Generates episodes from given ids
@@ -222,21 +225,26 @@ class HippocampusRefactored():
             torch.Tensor: Episode of size [event_per_episode, dim_event]
         """
         if self.event_dataset.has_id(event_id):
-            _, characteristics, *_ = self.get_event(event_id)
+            id, characteristics, *_, priority = self.get_event(event_id)
         elif event is not None:
             characteristics = event.characteristics
         elif characteristics is None:
             raise ValueError("No event or characteristics was found")
         
         episode = [characteristics]
+        associated_id = []
+        associated_priority = []
         result_list = self.search(
             k=self.event_per_episode-1,
             characteristics=characteristics
         )
         episode = [characteristics]
         for result in result_list:
-            _, characteristics, *_ = self.get_event(result[0])
+            id, characteristics, *_, priority = self.get_event(result[0])
             episode.append(characteristics)
+        for i, id in enumerate(associated_id):
+            priority = associated_priority[i]
+            self.event_dataset.update_priority(id, self.priority_method[1], eval1=priority, rate=0.5)
         return torch.stack(episode)
     
     def generate_episodes_batch(self, event_ids: Sequence[int] = None, events: Sequence[EventData] = None, characteristics: Sequence[torch.Tensor] = None, batch_size: int = None):
@@ -366,7 +374,7 @@ class HippocampusRefactored():
             json.dump(dict_config, f)
     
     @classmethod
-    def load_from_file(cls, file_path: str) -> "Hippocampus":
+    def load_from_file(cls, file_path: str) -> "HippocampusRefactored":
         """Loads and structures Hippocampus from file
 
         Args:
