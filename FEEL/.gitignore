@@ -1,4 +1,5 @@
 outs/
-data/
+data/EmVidCap
+data/kinetics-dataset
 weights/
 *.out

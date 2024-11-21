@@ -57,6 +57,8 @@ class PFC(nn.Module):
             dim_feedforward (int, optional): Dimension to feed forward. Defaults to 2048.
             num_encoder_layers (int, optional): Number of encoded layer. Defaults to 6.
         """
+        self.size_episode = size_episode
+        self.dim_event = dim_event
         super(PFC, self).__init__()
         
         self.conv = nn.Linear(dim_event, d_model)
@@ -76,23 +78,19 @@ class PFC(nn.Module):
         """forward
 
         Args:
-            src (torch.Tensor): Flattened / squeezed version of Characteristic2 ([dim_event])
+            src (torch.Tensor): Input episode batch with shape [size_episode, batch_size, dim_event]
 
         Returns:
-            torch.Tensor: Output tensor ([1, dim_out])
+            torch.Tensor: Output tensor [dim_out]
         """
+        if not (src.size(0) == self.size_episode and src.size(2) == self.dim_event):
+            raise ValueError(f"Input shape must be (size_episode, batch_size, dim_event) = [{self.size_episode}, *, {self.dim_event}], got {src.shape}")
         src = self.conv(src)
-        print("PFC:",81, src.shape)
         src = self.positional_encoding(src)
-        print("PFC:",83, src.shape)
         # Pass through the Transformer Encoder
         encoded_output: torch.Tensor = self.encoder(src)
-        print("PFC:",86, encoded_output.shape)
-        print("PFC:", encoded_output)
         # Pool the output
-        pooled_output = encoded_output.mean(dim=1)
-        print("PFC:",89, pooled_output.shape)
-        print("PFC:", pooled_output)
+        pooled_output = encoded_output.mean(dim=0)
         
         #Pass through classification head
         return self.classifier(pooled_output)

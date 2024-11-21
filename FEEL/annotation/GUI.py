@@ -4,8 +4,8 @@ from pathlib import Path
 import os
 
 # 保存先のデータベース（CSVファイル）の初期化
-DATABASE_FILE = "/home/u01230/SoccerNarration/FEEL/annotation/parameters_database.csv"
-VIDEO_DIR = "/home/u01230/SoccerNarration/FEEL/data/EmVidCap/Videos/EmVidCap-L/TrainVal_clips/Test"
+DATABASE_FILE = "/home/u01230/SoccerNarration/FEEL/annotation/params_trainval.csv"
+VIDEO_DIR = "/home/u01230/SoccerNarration/FEEL/data/EmVidCap/Videos/EmVidCap-L/TrainVal_clips/splitted_TrainVal"
 
 if not Path(DATABASE_FILE).exists():
     pd.DataFrame(columns=["video", "joy", "trust", "fear", "surprise", "sadness", "disgust", "anger", "anticipation"]).to_csv(
