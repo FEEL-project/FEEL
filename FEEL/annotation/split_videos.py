@@ -3,9 +3,9 @@ from pathlib import Path
 import subprocess
 
 # 動画ファイルが保存されているディレクトリ
-SOURCE_DIR = "/home/u01230/SoccerNarration/FEEL/data/EmVidCap/Videos/EmVidCap-L/TrainVal_clips/Test"
+SOURCE_DIR = "../data/EmVidCap/Videos/EmVidCap-L/TrainVal_clips/Test"
 # 分割後のファイルを保存するディレクトリ
-OUTPUT_DIR = "/home/u01230/SoccerNarration/FEEL/data/EmVidCap/Videos/EmVidCap-L/TrainVal_clips/splitted_Test"
+OUTPUT_DIR = "../data/EmVidCap/Videos/EmVidCap-L/TrainVal_clips/splitted_Test"
 os.makedirs(OUTPUT_DIR, exist_ok=True)  # 出力ディレクトリを作成
 
 # 動画の長さを取得する関数
