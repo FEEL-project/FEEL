@@ -73,10 +73,10 @@ class PFC(nn.Module):
         """forward
 
         Args:
-            src (torch.Tensor): Flattened / squeezed version of Characteristic2 ([dim_event])
+            src (torch.Tensor): Input episode batch with shape [seq_len, batch_size, embedding_dim]
 
         Returns:
-            torch.Tensor: Output tensor ([1, dim_out])
+            torch.Tensor: Output tensor [dim_out]
         """
         src = self.conv(src)
         print(81, src.shape)
