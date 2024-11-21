@@ -20,7 +20,8 @@ class Hippocampus():
 	3. memory内のeventを、計算された重みで決まる確率に従ってreplayする
 	"""
 	def __init__(self, dimension=768, replay_rate=10, replay_iteration=5, 
-              size_episode=3, minimal_to_generate=8):
+              size_episode=3, minimal_to_generate=8, minimal_to_loss=100,
+              minimal_to_replay=100, replay_batch_size=5):
 		# hyper-parameters
 		self.cnt_events = 0 # 現在までの総event数
 		self.num_events = 0 # 現在memoryに存在するeventの数
@@ -28,15 +29,16 @@ class Hippocampus():
 		self.size_episode = size_episode 		# 生成するepisodeの長さ
 		self.minimal_to_generate = minimal_to_generate 	# episodeを生成するための最低限のevent数
 		# memory-loss
-		self.minimal_to_loss = 100 	# memory-lossが発生する最小のevent数
+		self.minimal_to_loss = minimal_to_loss 	# memory-lossが発生する最小のevent数
 		self.loss = True			# .no_loss()でFalse, .loss()でTrueに変更
 		self.loss_interval = 10 	# データセットからサンプルの削除頻度
 		self.loss_rate = 0.1 		# データセットから削除する割合
 		self.max_events = 1000 		# memoryに格納可能な最大event数
 		# replay parameters
-		self.minimal_to_replay = 100 	# replayが可能な最低限のevent数
+		self.minimal_to_replay = minimal_to_replay	# replayが可能な最低限のevent数
 		self.replay_rate = replay_rate 		# replayの頻度
-		self.replay_iteration = replay_iteration 	# 一度のreplayで生成するepisodeの数
+		self.replay_batch_size = replay_batch_size 	# replay時のbatch_size
+		self.replay_iteration = replay_iteration 	# 一度のreplayで生成する episode minibatch の数
 		
 		# memory(ベクトルデータベース), 類似度検索用
 		self.STM = VectorDatabase(dimension, index_type="Flat") # memory本体(Short-Term-Memory)
@@ -82,17 +84,24 @@ class Hippocampus():
 			raise ValueError("Invalid method.")
 		### issue: priorityの初期化方法を増やす
 
-	def update_priority(self, event_id, method:str='rate', new_evaluation2=None, rate=1.0):
+	def update_priority(self, event_ids, method:str='rate', evaluation2s=None, rate=1.0):
 		"""
 		methodを指定して、eventのpriorityを更新する
 		1. rate: priorityにevaluation1のrate倍を加算する
 		"""
-		self.event_dataset.update_priority(event_id, method, 
-                                     new_evaluation2=new_evaluation2, 
+		if evaluation2s != None and len(event_ids) != len(evaluation2s):
+			raise ValueError("Size of event_ids is not consistent with that of evaluation2s.")
+		if method == 'replace' and evaluation2s == None:
+			raise ValueError("evaluation2s is required when method is 'replace'.")
+		for i, event_id in enumerate(event_ids):
+			if isinstance(event_id, torch.Tensor):
+				event_id = event_id.item()
+			self.event_dataset.update_priority(event_id, method=method, 
+                                     evaluation2=evaluation2s[i] if method=='replace' else None,
                                      rate=rate)
-		### issue: 追加された更新方法に対応する引数を渡す
+		### issue: 追加された更新方法に対応する引数を渡す->'rate'ならevaluation2はNoneで良い
 		
-	def sample(self, batch_size=1):
+	def sample(self, batch_size=1)->Dict[str, torch.tensor]:
 		"""
 		一つサンプルを生成する
 		"""
@@ -104,7 +113,7 @@ class Hippocampus():
 			self.replay_generator = WeightedRandomSampler(weights, self.replay_iteration)
 			self.DataLoader = DataLoader(self.event_dataset, sampler=self.replay_generator, batch_size=batch_size)
 		return next(iter(self.DataLoader))
-	
+  
 	def get_event(self, event_id):
 		"""
 		event_idからcharacteristicsを取得する
@@ -140,24 +149,36 @@ class Hippocampus():
 			self.event_dataset.remove_by_id(id_removed)	# memory (EventDataset) から削除
 			self.STM.remove(id_removed)					# ShortTermMemory (VectorDatabase) から削除
 			
-	def replay(self, batch_size=1):
+	def replay(self, batch_size=1)->List[Dict[str, Union[int, torch.tensor]]]:
 		"""
 		1. memoryから自発的にeventをサンプリングし、前頭前野へと出力する
 			# eventからの経過時間
 			# eventのインパクト
 		2. 必要に応じて、weightが小さすぎるサンプルを削除する
 		"""
+		if self.num_events <= self.minimal_to_replay:
+			raise ValueError("Hippocampus.replay: Required number of events are not stored yet.")
 		# eventのサンプリング
-		event = self.sample(batch_size)
-		# priorityの更新
-		ids = event['id']
-		for event_id in ids:
-			self.event_dataset.update_priority(event_id, method=self.priority_method[1])
+		events = self.sample(batch_size) # -> {id: torch.tensor([]), characteristics: torch.tensor([]), evaluation1: torch.tensor([]), evaluation2: torch.tensor([])}
+		print("Hippocampus.replay: \n", events)
+		if events == None:
+			raise ValueError("Hippocampus.replay: No event is sampled.")
+		self.update_priority(events['id'], method=self.priority_method[1], evaluation2s=events['evaluation2'], rate=0.5) ### issue: idの形式
+		### issue: receiveと出力形式が異なる
+		new_events = []
+		for i in range(batch_size):
+			event = {}
+			event['id'] = events['id'][i].item()
+			event['characteristics'] = events['characteristics'][i]
+			event['evaluation1'] = events['evaluation1'][i]
+			event['evaluation2'] = events['evaluation2'][i]
+			new_events.append(event)
+		###
 		# 更新・不要サンプルの削除
 		self.num_replay += batch_size
-		if self.loss and self.num_replay % self.loss_interval == 0:
+		if self.loss and self.num_replay % self.loss_interval == 0 or self.num_events > self.max_events:
 			self.memory_loss()
-		return event
+		return new_events
 		
 	def generate_episode(self, events=None, batch_size=1) -> torch.tensor:
 		"""
@@ -178,15 +199,23 @@ class Hippocampus():
 			result_list = self.search(k=self.size_episode-1, 
 											characteristics=event['characteristics']) # List[Tuple[int, float]]
 			episode = [event.get('characteristics')] # initiating event of episode i
+			associated_id = []
+			associated_priority = []
 			for j in range(self.size_episode-1):
-				episode.append(self.get_event(result_list[j][0])['characteristics'])	# result_list[j][0]: event_id, result_list[j][1]: distance
+				event = self.get_event(result_list[j][0])
+				episode.append(event['characteristics'])	# result_list[j][0]: event_id, result_list[j][1]: distance
+				associated_id.append(result_list[j][0])
+				associated_priority.append(event['evaluation2'])
+			### issue: searchにより連想されたeventのpriorityを更新する->以下で対応
+			self.update_priority(associated_id, method=self.priority_method[1],evaluation2s=associated_priority, rate=0.5)
+   
 			episode_tensor = torch.stack(episode)
 			episode_batch.append(episode_tensor)
 		out = torch.stack(episode_batch)
 		# print(out.shape)
 		return out
 		
-	def receive(self, characteristics=None, evaluation1=None):
+	def receive(self, characteristics=None, evaluation1=None)->List[Dict[str, Union[int, torch.tensor]]]:
 		"""
 		知覚したeventに関連する情報を受け取り、辞書フォーマット(のリスト)で返す
 		1. characteristics: torch.tensor, size=(B,768)
@@ -226,6 +255,8 @@ class Hippocampus():
 		### issue: error handling
 		if event_id == -1 and event.get('id') != None:
 			event_id = event['id']
+			if isinstance(event_id, torch.Tensor):
+				event_id = event_id.item()
 		if characteristics == None and 'characteristics' in event:
 			characteristics = event['characteristics']
 		if evaluation1 == None and 'evaluation1' in event:
