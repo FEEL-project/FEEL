@@ -4,6 +4,7 @@ import torch
 from torch.utils.data import Dataset, DataLoader
 import os
 from pathlib2 import Path
+import csv
 
 class VideoDataset(Dataset):
     def __init__(self, paths, labels, clip_length, frame_size=(224, 224)):
@@ -56,23 +57,35 @@ class VideoDataset(Dataset):
 
         return inputs, label
 
+def csv_to_dict(file_path):
+    result_dict = {}
+    with open(file_path, mode='r', newline='', encoding='utf-8') as f:
+        reader = csv.reader(f)
+        # ヘッダーをスキップ
+        next(reader)
+        for row in reader:
+            key = row[0]
+            values = row[1:]
+            values = list(map(float, row[1:])) 
+            values = torch.tensor(values)
+            result_dict[key] = values
+    return result_dict
 
-def load_video_dataset(video_dir: str, batch_size: int, clip_length: int)->DataLoader:
+def load_video_dataset(video_dir: str, label_path: str, batch_size: int, clip_length: int)->DataLoader:
 # 動画データセットのディレクトリ
     video_dir_path = Path(video_dir)
-
+    label_df = csv_to_dict(label_path)
     # 動画ファイルパスとラベルの準備
     paths = []
     labels = []
     for video_file in video_dir_path.glob('*.mp4'):
-        file_name = video_file.stem
-        label_id = (int(file_name.split('_')[0]) - 10.0)/10.0  # ファイル名の先頭2文字をラベルとする
         full_path = os.path.join(video_dir, video_file.name)
         paths.append(full_path)
-        labels.append(label_id)
+        labels.append(label_df[video_file.name])
 
     # データセットとDataLoaderの作成
     data_set = VideoDataset(paths, labels, clip_length=clip_length)
-    print(f'{len(data_set)=}')
 
     return DataLoader(data_set, batch_size=batch_size, shuffle=True)
+
+# python load_video_dataset('/home/ghoti/FEEL/FEEL/data/small_data/renamed', '/home/ghoti/FEEL/FEEL/annotation/params_test.csv', 2, 16)
