@@ -2,10 +2,15 @@ import os
 from pathlib import Path
 import subprocess
 
+# EmVidCapの場合
 # 動画ファイルが保存されているディレクトリ
-SOURCE_DIR = "../data/EmVidCap/Videos/EmVidCap-L/TrainVal_clips/Test"
+# SOURCE_DIR = "/home/u01231/project_body/FEEL/data/EmVidCap/Videos/EmVidCap-L/TrainVal_clips/Test"
 # 分割後のファイルを保存するディレクトリ
-OUTPUT_DIR = "../data/EmVidCap/Videos/EmVidCap-L/TrainVal_clips/splitted_Test"
+# OUTPUT_DIR = "/home/u01231/project_body/FEEL/data/EmVidCap/Videos/EmVidCap-L/TrainVal_clips/splitted_Test"
+
+# joeの場合
+SOURCE_DIR = "/home/u01231/project_body/FEEL/data/youtube_movies/joe"
+OUTPUT_DIR = "/home/u01231/project_body/FEEL/data/youtube_movies/joe/splitted"
 
 os.makedirs(OUTPUT_DIR, exist_ok=True)  # 出力ディレクトリを作成
 
