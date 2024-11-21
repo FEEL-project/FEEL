@@ -25,10 +25,12 @@ class Elaborator(nn.Module):
         if pretrained_hippocampus is not None:
             self.hippocampus = Hippocampus.load_from_file(pretrained_hippocampus)
         else:
-            self.hippocampus = Hippocampus(hippocampus_params['dimension'],
-                                           hippocampus_params['size_episode'],
-                                           hippocampus_params['replay_rate'],
-                                           hippocampus_params['replay_iteration'],)
+            self.hippocampus = Hippocampus(
+                hippocampus_params['dimension'],
+                hippocampus_params['size_episode'],
+                replay_rate=hippocampus_params['replay_rate'],
+                episode_per_replay=hippocampus_params['replay_iteration'],
+            )
         self.prefrontal_cortex = PFC()
         if pretrained_sensory_cortex is not None:
             self.sensory_cortex.load_state_dict(torch.load(pretrained_sensory_cortex))
@@ -49,9 +51,11 @@ class Elaborator(nn.Module):
         1. video is the only input
         2. not save event to hippocampus
         """
-        x = self.sensory_cortex(x)
-        event = self.hippocampus.receive(x)
+        x, y, z = self.sensory_cortex(x)
+        print(f"{x.shape=}, {y.shape=}, {z.shape=}")
+        event = self.hippocampus.receive(y)
         episode = self.hippocampus.generate_episode(event)
+        episode = episode.transpose(0, 1)
         pre_eval = self.prefrontal_cortex(episode)
         evaluation = self.amygdala(x1 = x, pre_evaluation = pre_eval)
         return evaluation

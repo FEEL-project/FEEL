@@ -35,7 +35,7 @@ class EventData:
     """A simple wrapper for data acquired by EventDataset
     """
     id: int
-    data: torch.Tensor
+    characteristics: torch.Tensor
     eval1: float
     eval2: torch.Tensor
     priority: float
@@ -73,7 +73,7 @@ class EventDataset(Dataset):
     ):
         self._df = pd.DataFrame(
             data=[],
-            columns=["data", "eval1", "eval2", "priority"]
+            columns=["characteristics", "eval1", "eval2", "priority"]
         )
         self._cast_type()
     
@@ -88,10 +88,10 @@ class EventDataset(Dataset):
             idx (int): Index
 
         Returns:
-            Tuple[int, torch.Tensor, float, torch.Tensor, float]: id, data, eval1, eval2, priority
+            Tuple[int, torch.Tensor, float, torch.Tensor, float]: id, characteristics, eval1, eval2, priority
         """
         row = self._df.iloc[idx]
-        return row.name, row["data"], row["eval1"], row["eval2"], row["priority"]
+        return row.name, row["characteristics"], row["eval1"], row["eval2"], row["priority"]
     
     def get_priority(self) -> list:
         """Returns a tensor of priority
@@ -115,12 +115,12 @@ class EventDataset(Dataset):
             ValueError: If id does not exist
         
         Returns:
-            Tuple[int, torch.Tensor, float, torch.Tensor, float]: id, data, eval1, eval2, priority
+            Tuple[int, torch.Tensor, float, torch.Tensor, float]: id, characteristics, eval1, eval2, priority
         """
         if not self.has_id(id):
             raise ValueError(f"Data with id {id} does not exist")
         row = self._df.loc[id]
-        return id, row["data"], row["eval1"], row["eval2"], row["priority"]
+        return id, row["characteristics"], row["eval1"], row["eval2"], row["priority"]
     
     def remove_by_id(self, id: int) -> None:
         """Removes data with the specified id
@@ -135,12 +135,12 @@ class EventDataset(Dataset):
             raise ValueError(f"Data with id {id} does not exist")
         del self._df.loc[id]
     
-    def add_item(self, id: int, data: torch.Tensor, eval1: Any, eval2: torch.Tensor, priority: Any) -> None:
+    def add_item(self, id: int, characteristics: torch.Tensor, eval1: Any, eval2: torch.Tensor, priority: Any) -> None:
         """Adds item to dataset
 
         Args:
             id (int): id
-            data (torch.Tensor): Characteristic of video
+            characteristics (torch.Tensor): Characteristic of video
             eval1 (Any): Intuitive emotional response, either in float, Tensor or ndarray
             eval2 (torch.Tensor): Emotional response after processing
             priority (Any): Priority, either in float, Tensor or ndarray
@@ -148,7 +148,7 @@ class EventDataset(Dataset):
         assert not self.has_id(id), ValueError(f"Data with id {id} already exists")
         eval1 = compress0d(eval1)
         priority = compress0d(priority)
-        self._df.loc[id] = {"data": data, "eval1": eval1, "eval2": eval2, "priority": priority}
+        self._df.loc[id] = {"characteristics": characteristics, "eval1": eval1, "eval2": eval2, "priority": priority}
     
     def update_priority(self, id: int, method: Literal["rate", "replace"], eval1: float, rate: float=1.0) -> None:
         assert self.has_id(id), f"Data with id {id} does not exist"
@@ -175,7 +175,7 @@ class EventDataset(Dataset):
         self._df.to_json(file_path, default_handler=handler)
     
     def _cast_type(self) -> None:
-        self._df["data"] = self._df["data"].astype(object).apply(torch.Tensor)
+        self._df["characteristics"] = self._df["characteristics"].astype(object).apply(torch.Tensor)
         self._df["eval1"] = self._df["eval1"].apply(compress0d).astype(float)
         self._df["eval2"] = self._df["eval2"].astype(object).apply(torch.Tensor)
         self._df["priority"] = self._df["priority"].apply(compress0d).astype(float)

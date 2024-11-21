@@ -1,8 +1,8 @@
 import torch
 import torch.linalg
 import torch.nn as nn
-from torch.utils.data import WeightedRandomSampler, DataLoader
-from typing import Literal, Any, Generator, Tuple
+from torch.utils.data import WeightedRandomSampler, DataLoader, Sampler
+from typing import Literal, Generator, Tuple, Sequence, Any
 from queue import PriorityQueue
 import os
 import json
@@ -26,34 +26,36 @@ class Counter():
 
 class Hippocampus():
     """A class representing the hippocampus of the brain
+    - Memory loss occurs when replayed
     """
     # Episode and event
     dim_event: int
     event_per_episode: int
+    min_event_for_episode: int
     
     # Replay
-    min_event_for_replay: int = 100
+    min_event_for_replay: int
     replay_rate: int
     episode_per_replay: int
     times_replayed: int = 0
     
     # Data count
-    max_len_dataset: int = 1000
+    max_len_dataset: int
     
     # Loss
-    min_event_for_loss: int = 100
+    min_event_for_loss: int
     enable_loss: bool = True
-    loss_freq: int = 10
-    loss_rate: float = 0.1
+    loss_freq: int
+    loss_rate: float
     
     # Priority
-    base_priority: float = 100.
+    base_priority: float
     priority_method: tuple[Literal["base"], Literal["rate"]] = ("base", "rate")
     priority_queue: PriorityQueue
     
     # Generator
     id_generator: Counter
-    replay_generator: Any = None
+    replay_generator: Sampler = None
     data_loader: DataLoader = None
     
     stm: VectorDatabase
@@ -63,13 +65,43 @@ class Hippocampus():
         self,
         dim_event: int = 768,
         event_per_episode: int = 3,
+        min_event_for_episode: int = 8,
         replay_rate: int = 10,
-        episode_per_replay: int = 5
+        episode_per_replay: int = 5,
+        min_event_for_replay: int = 100,
+        max_len_dataset: int = 1000,
+        min_event_for_loss: int = 100,
+        loss_freq: int = 10,
+        loss_rate: float = 0.1,
+        base_priority: float = 100.,
     ):
+        """_summary_
+
+        Args:
+            dim_event (int, optional): Dimension of event characteristics. Defaults to 768. (Note: unused)
+            event_per_episode (int, optional): Number of episodes in an event, or event_size. Defaults to 3.
+            min_event_for_episode (int, optional): Minimum number of event to generate an episode. Defaults to 8.
+            replay_rate (int, optional): Replay rate. Defaults to 10. (Note: unused)
+            episode_per_replay (int, optional): Number of episode to generate while replaying. Defaults to 5.
+            min_event_for_replay (int, optional): Number of events to call replay, aka `replay_iteration`. Defaults to 100.
+            max_len_dataset (int, optional): Maximum length of dataset. Defaults to 1000.
+            min_event_for_loss (int, optional): Minimum number of events for memory loss to happen. Defaults to 100.
+            loss_freq (int, optional): How often memory loss happens. Defaults to 10.
+            loss_rate (float, optional): Ratio of memory to lose. Defaults to 0.1.
+            base_priority (float, optional): Base priority. Defaults to 100..
+        """
         self.dim_event = dim_event
         self.event_per_episode = event_per_episode
+        self.min_event_for_episode = min_event_for_episode
+        self.min_event_for_replay = min_event_for_replay
         self.replay_rate = replay_rate
         self.episode_per_replay = episode_per_replay
+        self.max_len_dataset = max_len_dataset
+        self.min_event_for_loss = min_event_for_loss
+        self.loss_freq = loss_freq
+        self.loss_rate = loss_rate
+        self.base_priority = base_priority
+        
         self.priority_queue = PriorityQueue()
         self.stm = VectorDatabase(dim_event)
         self.event_dataset = EventDataset()
@@ -120,7 +152,7 @@ class Hippocampus():
             event_id (int): The id of an event
 
         Returns:
-            Tuple[int, torch.Tensor, float, torch.Tensor, float]: id, data, eval1, eval2, priority
+            Tuple[int, torch.Tensor, float, torch.Tensor, float]: id, characteristics, eval1, eval2, priority
         """
         return self.event_dataset.get_by_id(event_id)
     
@@ -174,51 +206,119 @@ class Hippocampus():
                 self.organize_memory()
         return events
     
-    def generate_episode(self, event_id: int, batch_size: int = 1) -> torch.Tensor:
-        """Searches event relevant to the given event and returns an episode
+    def generate_episode(self, event_id: int = None, event: EventData = None, characteristics: torch.Tensor = None) -> torch.Tensor:
+        """Generates episodes from given ids
 
         Args:
-            event (_type_): Event to search the related memory for
-            batch_size (int, optional): Batch size. Defaults to 1.
+            event_id (int, optional): The id of the event. Defaults to None.
+            event (EventData, optional): The event. Defaults to None.
+            characteristics (torch.Tensor, optional): The characteristics. Defaults to None.
+
+        Raises:
+            ValueError: If batch size does not match the number of events
+            ValueError: If no matching event was found
 
         Returns:
-            torch.Tensor: Episode of size [batch_size, event_per_episode, dim_event]
+            torch.Tensor: Episode of size [event_per_episode, dim_event]
         """
-        if len(self) <= self.min_event_for_replay:
-            return None
-        if not self.event_dataset.has_id(event_id):
-            raise ValueError("No matching event was found")
-        event = parse_event_data(self.get_event(event_id))
-        episode_batch = []
-        for i in range(batch_size):
-            result_list = self.search(
-                k=self.event_per_episode-1,
-                characteristics=event.data
-            )
-            episode = [event.data]
-            for result in result_list:
-                _, data, *_ = self.get_event(result[0])
-                episode.append(data)
-            episode = torch.stack(episode)
-            episode_batch.append(episode)
-        return torch.stack(episode_batch)
+        if self.event_dataset.has_id(event_id):
+            _, characteristics, *_ = self.get_event(event_id)
+        elif event is not None:
+            characteristics = event.characteristics
+        elif characteristics is None:
+            raise ValueError("No event or characteristics was found")
+        
+        episode = [characteristics]
+        result_list = self.search(
+            k=self.event_per_episode-1,
+            characteristics=characteristics
+        )
+        episode = [characteristics]
+        for result in result_list:
+            _, characteristics, *_ = self.get_event(result[0])
+            episode.append(characteristics)
+        return torch.stack(episode)
     
-    def receive(self, data: torch.Tensor, eval1: float) -> EventData:
-        """Gets new data and stores it
+    def generate_episodes_batch(self, event_ids: Sequence[int] = None, events: Sequence[EventData] = None, characteristics: Sequence[torch.Tensor] = None, batch_size: int = None):
+        """Generates episodes from given ids
 
         Args:
-            data (torch.Tensor): _description_
-            eval1 (float): _description_
+            event_ids (Sequence[int], optional): List of event ids. Defaults to None.
+            events (Sequence[EventData], optional): List of events. Defaults to None.
+            characteristics (Sequence[torch.Tensor], optional): The characteristics. Defaults to None.
+            batch_size (int, optional): Batch size. Defaults to None.
+
+        Raises:
+            ValueError: If batch size does not match the number of events
+            ValueError: If no matching event was found
+
+        Returns:
+            torch.Tensor: Episode of size [event_per_episode, dim_event]
         """
-        event_id = next(self.id_generator)
-        event = EventData(event_id, data, eval1, None, None)
-        return event
+        if event_ids is not None:
+            if batch_size is None:
+                batch_size = len(event_ids)
+            if batch_size != len(event_ids):
+                raise ValueError(f"Batch size does not match the number of events: expected {batch_size}, got {len(event_ids)}")
+            episodes = []
+            for i in range(batch_size):
+                episodes.append(self.generate_episode(event_id=event_ids[i]))
+            return torch.stack(episodes)
+        elif events is not None:
+            if batch_size is None:
+                batch_size = len(events)
+            if batch_size != len(events):
+                raise ValueError(f"Batch size does not match the number of events: expected {batch_size}, got {len(events)}")
+            episodes = []
+            for i in range(batch_size):
+                episodes.append(self.generate_episode(event=events[i]))
+            return torch.stack(episodes)
+        elif characteristics is not None:
+            if batch_size is None:
+                batch_size = len(characteristics)
+            if batch_size != len(characteristics):
+                raise ValueError(f"Batch size does not match the number of events: expected {batch_size}, got {len(characteristics)}")
+            episodes = []
+            for i in range(batch_size):
+                episodes.append(self.generate_episode(characteristics=characteristics[i]))
+            return torch.stack(episodes)
+        else:
+            raise ValueError("No event or characteristics was found")
+    
+    def receive(self, characteristics: torch.Tensor, eval1: torch.Tensor, batch_size: int|None = None) -> list[EventData]:
+        """Receives a batch of data and creates ids
+
+        Args:
+            characteristics (torch.Tensor): Characteristics of size [batch_size, dim_characteristics]
+            eval1 (torch.Tensor): Characteristics of size [batch_size]
+            batch_size (int | None, optional): Batch size. Defaults to None.
+
+        Raises:
+            TypeError: If shape of characteristics or eval1 is invalid
+
+        Returns:
+            list[EventData]: list of EventData objects
+        """
+        # Checks shape of characteristics and eval1
+        if batch_size is None:
+            batch_size = characteristics.size(0)
+        if batch_size != characteristics.size(0):
+            raise TypeError(f"Wrong size of characteristics: expected ({batch_size}, n), got {characteristics.size()}")
+        if batch_size != eval1.size(0):
+            raise TypeError(f"Wrong size of eval1: expected ({batch_size}), got {eval1.size()}")
+        events = []
+        for i in range(batch_size):
+            characteristics_i = characteristics[i]
+            eval1_i = eval1[i].item()
+            event_id = next(self.id_generator)
+            events.append(EventData(event_id, characteristics_i, eval1_i, None, None))
+        return events
     
     def save_to_memory(
         self,
         event: EventData,
-        event_id: int = -1,
-        data: torch.Tensor = None,
+        event_id: int = None,
+        characteristics: torch.Tensor = None,
         eval1: float = None,
         eval2: torch.Tensor = None,
         priority: float = None
@@ -228,13 +328,13 @@ class Hippocampus():
         Args:
             event (EventData): Event to save
         """
-        event_id = event_id if event_id != -1 else event.id
-        data = data if data is not None else event.data
+        event_id = event_id if event_id is not None else event.id
+        characteristics = characteristics if characteristics is not None else event.characteristics
         eval1 = eval1 if eval1 is not None else event.eval1
         eval2 = eval2 if eval2 is not None else event.eval2
         priority = priority if priority is not None else self.init_priority(event_id, eval1, self.priority_method[0])
-        self.event_dataset.add_item(event_id, data, eval1, eval2, priority)
-        self.stm.add(event_id, data)
+        self.event_dataset.add_item(event_id, characteristics, eval1, eval2, priority)
+        self.stm.add(event_id, characteristics)
         self.priority_queue.put((event_id, priority))
     
     def save_to_file(self, file_path: str) -> None:
@@ -250,6 +350,7 @@ class Hippocampus():
         dict_config = {
             "dim_event": self.dim_event,
             "event_per_episode": self.event_per_episode,
+            "min_event_for_episode": self.min_event_for_episode,
             "min_event_for_replay": self.min_event_for_replay,
             "replay_rate": self.replay_rate,
             "episode_per_replay": self.episode_per_replay,
@@ -285,6 +386,7 @@ class Hippocampus():
             dict_config: dict = json.load(f)
         self.dim_event = dict_config["dim_event"]
         self.event_per_episode = dict_config["event_per_episode"]
+        self.min_event_for_episode = dict_config["min_event_for_episode"]
         self.min_event_for_replay = dict_config["min_event_for_replay"]
         self.replay_rate = dict_config["replay_rate"]
         self.episode_per_replay = dict_config["episode_per_replay"]
