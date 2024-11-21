@@ -71,7 +71,7 @@ def seeing(video_dir: str, debug=False):
             _, c2, outputs = mvit(inputs)
             eval_1 = elaborator.subcortical_pathway(c2)
             if debug:
-                print(f"shape of c2: {c2.shape}, shape of labels: {labels.shape}")
+                print(f"shape of c2: {c2.shape}, shape of labels: {labels.shape}, shape of eval_1: {eval_1.shape}")
             events = elaborator.hippocampus.receive(characteristics=c2, evaluation1=labels)
             # events = elaborator.hippocampus.receive(characteristics=c2, evaluation1=eval_1) # eval_1のラベルがない場合(testモード)
             for i in range(len(events)):
