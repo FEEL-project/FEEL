@@ -69,7 +69,10 @@ class PFC(nn.Module):
         )
         self.encoder = nn.TransformerEncoder(encoder_layer, num_encoder_layers)
         
-        self.classifier = nn.Linear(d_model, dim_out)
+        self.classifier =nn.Sequential(
+            nn.Linear(d_model, dim_out),
+            nn.Sigmoid()
+        )
     
     def forward(self, src: torch.Tensor) -> torch.Tensor:
         """forward
@@ -81,7 +84,7 @@ class PFC(nn.Module):
             torch.Tensor: Output tensor [dim_out]
         """
         if not (src.size(0) == self.size_episode and src.size(2) == self.dim_event):
-            raise ValueError(f"Input shape must be (size_episode, batch_size, dim_event) = ({self.size_episode}, *, {self.dim_event}), got {src.shape}")
+            raise ValueError(f"Input shape must be (size_episode, batch_size, dim_event) = [{self.size_episode}, *, {self.dim_event}], got {src.shape}")
         src = self.conv(src)
         src = self.positional_encoding(src)
         # Pass through the Transformer Encoder
@@ -91,3 +94,41 @@ class PFC(nn.Module):
         
         #Pass through classification head
         return self.classifier(pooled_output)
+    
+
+class PFC_nn(nn.Module):
+    def __init__(self, dim_event: int = 768, size_episode: int = 5, dim_out: int = 8):
+        super(PFC_nn, self).__init__()
+        self.flatten = nn.Flatten()
+        self.size_episode = size_episode
+        self.dim_event = dim_event
+        self.dim_out = dim_out
+        self.fc1 = nn.Linear(size_episode * dim_event, 1024)
+        self.fc2 = nn.Linear(1024, 512)
+        self.fc3 = nn.Linear(512, 256)
+        self.fc4 = nn.Linear(256, 128)
+        self.fc5 = nn.Linear(128, 64)
+        self.fc6 = nn.Linear(64, dim_out)
+        self.relu = nn.ReLU()
+        self.dropout = nn.Dropout(0.2)
+    
+    def forward(self, src: torch.Tensor) -> torch.Tensor:
+        src = self.flatten(src)
+        x = self.fc1(src)
+        x = self.relu(x)
+        x = self.dropout(x)
+        x = self.fc2(x)
+        x = self.relu(x)
+        x = self.dropout(x)
+        x = self.fc3(x)
+        x = self.relu(x)
+        x = self.dropout(x)
+        x = self.fc4(x)
+        x = self.relu(x)
+        x = self.dropout(x)
+        x = self.fc5(x)
+        x = self.relu(x)
+        x = self.dropout(x)
+        x = self.fc6(x)
+        x = torch.sigmoid(x) 
+        return x
