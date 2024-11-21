@@ -44,7 +44,7 @@ def enhanced_mvit(video_dir: str):
             print(pfc_output.shape)
             break
 
-def seeing(video_dir: str):
+def seeing(video_dir: str, debug=False):
     """
     動画を渡して、評価を出力させる
     """
@@ -64,41 +64,43 @@ def seeing(video_dir: str):
     evaluation2 = torch.tensor([0.0, 0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7]) # 仮の最終感情評価
     cnt = 0
     for inputs, labels in train_loader:
-        print("inputs")
-        print(inputs.shape)
-        print("labels")
-        print(labels)
+        if debug:
+            print(f"shape of inputs: {inputs.shape}, shape of labels: {labels.shape}")
+            print(f"value of labels: {labels}")
         with torch.no_grad():
-            c1, c2, outputs = mvit(inputs)
-            # print(f"shape of c2: {c2.shape}, shape of labels: {labels.shape}")
-            events = elaborator.hippocampus.receive(characteristics=c2, evaluation1=labels) ### issue: mini-batchに対応していない->解消
-            # print("event")
-            # print(f"length of event['id']: {len(event['id'])}, shape of event['characteristics']: {event['characteristics'].shape},shape of event['evaluation1']: {event['evaluation1'].shape}")
+            _, c2, outputs = mvit(inputs)
+            eval_1 = elaborator.subcortical_pathway(c2)
+            if debug:
+                print(f"shape of c2: {c2.shape}, shape of labels: {labels.shape}")
+            events = elaborator.hippocampus.receive(characteristics=c2, evaluation1=labels)
+            # events = elaborator.hippocampus.receive(characteristics=c2, evaluation1=eval_1) # eval_1のラベルがない場合(testモード)
+            for i in range(len(events)):
+                event = events[i]
+                if debug and i == 0:
+                    print(f"event_id: {event['id']}, shape of characteristics: {event['characteristics'].shape}, shape of evaluation1: {event['evaluation1'].shape}")
+                elaborator.hippocampus.save_to_memory(event=event,
+                                                        evaluation2=evaluation2)
             if cnt < 10:
-                for i in range(len(events)):
-                    event = events[i]
-                    elaborator.hippocampus.save_to_memory(event=event,
-                                                          evaluation2=evaluation2)
+                pre_eval = elaborator.prefrontal_cortex(c2)
             else:
-                ### issue: hippocampusに十分な数のeventがないため、episodeが生成されない
-                # print(elaborator.hippocampus.num_events)
-                episode = elaborator.hippocampus.generate_episode(events, batch_size=batch_size)
+                if debug:
+                    print(elaborator.hippocampus.num_events)
+                if len(events) < batch_size:
+                    print(f"WARNING: size of this mini-batch ({len(events)}) is smaller than batch_size ({batch_size})")
+                episode = elaborator.hippocampus.generate_episode(events, batch_size=len(events))
                 print("episode")
                 print(episode)
-                break
+                pre_eval = elaborator.prefrontal_cortex(episode)
+                # break
             cnt += batch_size
-            pre_eval = elaborator.prefrontal_cortex(c2)
-            # pre_eval = elaborator.prefrontal_cortex(episode)
-            eval_1 = elaborator.subcortical_pathway(c2)
             eval_2 = elaborator.controller(eval_1, pre_eval)
-            # print("pre_eval")
-            # print(pre_eval)
-            # print("eval_1")
-            # print(eval_1)
-            # print("eval_2")
-            # print(eval_2)
+            if debug:
+                print(f"pre_eval: {pre_eval}")
+                print(f"eval_1: {eval_1}")
+                print(f"eval_2: {eval_2}")
+            print("==============================")
 
 
 if __name__ == "__main__":
-    seeing("./data/small_data/renamed")
+    seeing("./data/small_data/renamed", debug=True)
     # enhanced_mvit("./data/small_data/renamed")

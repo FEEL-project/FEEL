@@ -29,7 +29,7 @@ class Elaborator(nn.Module):
                                            replay_rate=hippocampus_params['replay_rate'],
                                            replay_iteration=hippocampus_params['replay_iteration'],
                                            size_episode=hippocampus_params['size_episode'])
-        self.prefrontal_cortex = PFC()
+        self.prefrontal_cortex = PFC(size_episode=hippocampus_params['size_episode'])
         if pretrained_sensory_cortex is not None:
             self.sensory_cortex.load_state_dict(torch.load(pretrained_sensory_cortex))
         self.subcortical_pathway = SubcorticalPathway()
