@@ -7,7 +7,7 @@ from datetime import datetime
 from dataset.video_dataset import load_video_dataset
 from utils import timeit
 from model import EnhancedMViT, PFC, Hippocampus, HippocampusRefactored, SubcorticalPathway, EvalController
-from save_and_load import load_model, save_model
+# from save_and_load import load_model, save_model
 
 BATCH_SIZE = 1
 CLIP_LENGTH = 16

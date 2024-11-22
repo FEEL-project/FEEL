@@ -208,7 +208,7 @@ class Hippocampus():
 				associated_priority.append(event['evaluation2'])
 			### issue: searchにより連想されたeventのpriorityを更新する->以下で対応
 			self.update_priority(associated_id, method=self.priority_method[1],evaluation2s=associated_priority, rate=0.5)
-			
+   
 			episode_tensor = torch.stack(episode)
 			print(episode_tensor.shape)
 			episode_batch.append(episode_tensor)

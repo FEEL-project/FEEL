@@ -131,7 +131,7 @@ class EventDataset(Dataset):
         self._df.at[id, "eval2"] = eval2
         self._df.at[id, "priority"] = priority
     
-    def update_priority(self, id: int, method: Literal["rate", "replace"], eval1: torch.Tensor, rate: float=1.0) -> None:
+    def update_priority(self, id: int, method: Literal["rate", "replace"], eval1: torch.Tensor, rate: float=1.0) -> float:
         assert self.has_id(id), f"Data with id {id} does not exist"
         if method == "rate":
             self._df.at[id, "priority"] += rate * torch.norm(self._df.at[id, "eval2"])
@@ -139,6 +139,7 @@ class EventDataset(Dataset):
             self._df.at[id, "priority"] = eval1
         else:
             raise TypeError(f"Unsupported method for update_priority(): {method}")
+        return self._df.at[id, "priority"].item()
     
     def save_to_file(self, file_path: str) -> None:
         """Save dataset to file
