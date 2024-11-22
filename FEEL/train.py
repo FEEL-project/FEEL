@@ -17,6 +17,15 @@ DEVICE = torch.device("cpu") #torch.device("cuda" if torch.cuda.is_available() e
 BATCH_LOG_FREQ = 10
 DEBUG = True
 
+def eval2_to_eval1(eval2: torch.Tensor) -> torch.Tensor:
+    """Convert eval2 to eval1
+    Args:
+        eval2 (torch.Tensor): Eval2 tensor
+    Returns:
+        torch.Tensor: Eval1 tensor
+    """
+    return torch.tensor(((eval2[0]+eval2[1])/2 - (eval2[2]+eval2[4]+eval2[5]+eval2[6])/4) * (2+eval[3]+eval[7]) / 4)
+
 def zero_padding(data: torch.Tensor, size:tuple) -> torch.Tensor:
     """Zero padding to make data size to size
     Args:
@@ -47,8 +56,8 @@ def train_subcortical_pathway_epoch(
     """
     losses = []
     for i, data in enumerate(data_loader):
-        inputs, _ = data
-        label_eval1 = torch.rand((1, 1)) #FIXME: eval1がないので適当に生成
+        inputs, label_eval2 = data
+        label_eval1 = eval2_to_eval1(label_eval2)
         with torch.no_grad():
             _, characteristics, _ = model_mvit(inputs)
         out_eval1 = model(characteristics)
@@ -61,6 +70,7 @@ def train_subcortical_pathway_epoch(
     logging.info(f"Average loss for epoch: {sum(losses)/len(losses)}")
 
 def train_pre_eval_epoch(
+    epoch: int,
     data_loader: DataLoader,
     model_mvit: EnhancedMViT,
     model_pfc: PFC,
@@ -86,8 +96,6 @@ def train_pre_eval_epoch(
             _, characteristics, _ = model_mvit(inputs)
         eval1 = model_subcortical_pathway(characteristics)
         events = model_hippocampus.receive(characteristics, eval1)
-        for event in events:
-            model_hippocampus.save_to_memory(event=event, eval1=eval1, eval2=labels_eval2) #FIXME: eval2をどうするか。正解データを使うのはおかしい気がする
         if len(model_hippocampus) < model_hippocampus.min_event_for_episode:
             episode = zero_padding(characteristics, (SIZE_EPISODE, BATCH_SIZE, DIM_CHARACTERISTICS))
             pre_eval = model_pfc(episode)
@@ -100,6 +108,9 @@ def train_pre_eval_epoch(
         losses.append(loss)
         if i % BATCH_LOG_FREQ == 0:
             logging.getLogger("batch").debug(f"Iteration {i}: loss {loss}")
+        if epoch==0:
+            for event in events:
+                model_hippocampus.save_to_memory(event=event, eval1=eval1, eval2=labels_eval2) 
     logging.info(f"Average loss for epoch: {sum(losses)/len(losses)}")
 
 def train_controller_epoch(
@@ -132,9 +143,6 @@ def train_controller_epoch(
             _, characteristics, _ = model_mvit(inputs)
         eval1 = model_subcortical_pathway(characteristics)
         events = model_hippocampus.receive(characteristics, eval1)
-        for event in events:
-            # FIXME: 2回に分けて学習を進める場合、hippocampusの記憶管理はどうするか。重複して記憶されるのは問題ないか？
-            model_hippocampus.save_to_memory(event=event, eval1=eval1, eval2=labels_eval2) #FIXME: eval2をどうするか。正解データを使うのはおかしい気がする
         if len(model_hippocampus) < model_hippocampus.min_event_for_episode:
             episode = zero_padding(characteristics, (SIZE_EPISODE, BATCH_SIZE, DIM_CHARACTERISTICS))
             pre_eval = model_pfc(episode)
@@ -197,19 +205,26 @@ def train_models(
     for epoch in range(EPOCHS):
         optim_pre_eval.zero_grad()
         logging.getLogger("epoch").info(f"Epoch {epoch}/{EPOCHS}")
-        train_pre_eval_epoch(data_loader, model_mvit, model_pfc, model_hippocampus, loss_pfc, optim_pre_eval)
+        train_pre_eval_epoch(epoch, data_loader, model_mvit, model_pfc, model_hippocampus, loss_pfc, optim_pre_eval)
         torch.save(model_pfc.state_dict(), os.path.join(write_path, f"pfc_{epoch}.pt"))
         model_hippocampus.save_to_file(os.path.join(write_path, f"hippocampus_{epoch}.json"))
         logging.getLogger("epoch").info(f"Epoch {epoch} done, hippocampus has {len(model_hippocampus)} memories")
     logging.info(f"Training PFC finished at {datetime.now().strftime('%Y%m%d_%H%M%S')}")
     
+    model_hippocampus = HippocampusRefactored(
+        DIM_CHARACTERISTICS,
+        SIZE_EPISODE,
+        replay_rate=10,
+        episode_per_replay=5,
+        min_event_for_episode=5,
+    )
     # Finally train controller
     model_pfc.eval()
     loss_controller = torch.nn.MSELoss()
     optim_controller = torch.optim.Adam(model_controller.parameters(), lr=0.001)
     for epoch in range(EPOCHS):
         optim_controller.zero_grad()
-        logging.getLogger("epoch").info(f"Epoch {epoch}/{EPOCHS}")
+        logging.getLogger("epoch").info(f"Epoch {epoch+1}/{EPOCHS}")
         train_controller_epoch(
             data_loader,
             model_mvit,
