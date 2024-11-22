@@ -2,7 +2,7 @@ import torch
 import torch.linalg
 import torch.nn as nn
 from torch.utils.data import WeightedRandomSampler, DataLoader, Sampler
-from typing import Literal, Generator, Tuple, Sequence, Any
+from typing import Literal, Generator, Tuple, Sequence, Any, List, Union
 from queue import PriorityQueue
 import os
 import json
@@ -49,7 +49,7 @@ class HippocampusRefactored():
     
     # Priority
     base_priority: float
-    priority_method: tuple[Literal["base"], Literal["rate"]] = ("base", "rate")
+    priority_method: Tuple[Literal["base"], Literal["rate"]] = ("base", "rate")
     priority_queue: PriorityQueue
     
     # Generator
@@ -109,10 +109,10 @@ class HippocampusRefactored():
     def __len__(self) -> int:
         return len(self.event_dataset)
     
-    def get_ids(self) -> list[int]:
+    def get_ids(self) -> List[int]:
         return self.event_dataset._df.index.tolist()
     
-    def init_priority(self, event_id: int, eval1: torch.Tensor|float, method: Literal["base"] = "base") -> float:
+    def init_priority(self, event_id: int, eval1: Union[torch.Tensor, float], method: Literal["base"] = "base") -> float:
         if method == "base":
             return (torch.abs(eval1) + self.base_priority).item()
         else:
@@ -146,7 +146,7 @@ class HippocampusRefactored():
         for item in tmp_list:
             self.priority_queue.put(item)
     
-    def sample(self, batch_size: int = 1) -> Tuple[torch.Tensor, torch.Tensor, torch.Tensor, torch.Tensor, torch.Tensor] | None:
+    def sample(self, batch_size: int = 1) -> Union[Tuple[torch.Tensor, torch.Tensor, torch.Tensor, torch.Tensor, torch.Tensor], None]:
         """Generates a sample from stored data
 
         Args:
@@ -175,7 +175,7 @@ class HippocampusRefactored():
         """
         return self.event_dataset.get_by_id(event_id)
     
-    def search(self, k: int = 5, event_id: int = -1, characteristics: torch.Tensor|None = None) -> list[Tuple[int, float]]:
+    def search(self, k: int = 5, event_id: int = -1, characteristics: Union[torch.Tensor, None] = None) -> List[Tuple[int, float]]:
         """Get a memory similar to that of the given event id
 
         Args:
@@ -312,7 +312,7 @@ class HippocampusRefactored():
         else:
             raise ValueError("No event or characteristics was found")
     
-    def receive(self, characteristics: torch.Tensor, eval1: torch.Tensor, batch_size: int|None = None) -> list[EventData]:
+    def receive(self, characteristics: torch.Tensor, eval1: torch.Tensor, batch_size: Union[int, None] = None) -> List[EventData]:
         """Receives a batch of data and creates ids
 
         Args:

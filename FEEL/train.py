@@ -335,11 +335,12 @@ if __name__ == "__main__":
     # 引数を解析
     args = parser.parse_args()
     
+    timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
     logging.basicConfig(level=logging.WARNING, 
                         format='{asctime} [{levelname:.4}] {name}: {message}', 
                         style='{', 
-                        filename=args.log_path,
-                        filemode='a')
+                        filename=args.out_dir + f"/train_{timestamp}.log",
+                        filemode='w')
     if DEBUG:
         logging.getLogger().setLevel(logging.DEBUG)
         logging.getLogger("batch").setLevel(logging.DEBUG)

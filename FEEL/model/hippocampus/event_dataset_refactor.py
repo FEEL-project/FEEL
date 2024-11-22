@@ -1,6 +1,6 @@
 import torch
 from torch.utils.data import Dataset
-from typing import Literal, Any, TypeVar, Tuple, Callable
+from typing import Literal, Any, TypeVar, Tuple, Callable, List
 from dataclasses import dataclass
 import pandas as pd
 import numpy as np
@@ -18,7 +18,7 @@ class EventData:
     eval2: torch.Tensor
     priority: torch.Tensor
 
-def _parse_event_data(fn: Callable[T, Tuple[int, torch.Tensor, float, torch.Tensor, float]]) -> Callable[T, EventData]:
+def _parse_event_data(fn: Callable[..., Tuple[int, torch.Tensor, float, torch.Tensor, float]]) -> Callable[..., EventData]:
     @wraps(fn)
     def wrapper(*args, **kwargs):
         res = fn(*args, **kwargs)
@@ -72,7 +72,7 @@ class EventDataset(Dataset):
         row = self._df.iloc[idx]
         return row.name, row["characteristics"], row["eval1"], row["eval2"], row["priority"]
     
-    def get_priority(self) -> list:
+    def get_priority(self) -> List[float]:
         """Returns a tensor of priority
 
         Returns:
