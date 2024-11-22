@@ -1,5 +1,7 @@
 outs/
 data/EmVidCap
+data/youtube_movies
 data/kinetics-dataset
 weights/
 *.out
+data/*.zip
