@@ -24,7 +24,7 @@ def eval2_to_eval1(eval2: torch.Tensor) -> torch.Tensor:
     Returns:
         torch.Tensor: Eval1 tensor
     """
-    return torch.tensor((eval2[0]+eval2[1]+eval2[7])/3 - (eval2[2]+eval2[4]+eval2[5]+eval2[6])/4)
+    return torch.tensor(((eval2[0]+eval2[1])/2 - (eval2[2]+eval2[4]+eval2[5]+eval2[6])/4) * (2+eval[3]+eval[7]) / 4)
 
 def zero_padding(data: torch.Tensor, size:tuple) -> torch.Tensor:
     """Zero padding to make data size to size
