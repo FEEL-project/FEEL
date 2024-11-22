@@ -2,6 +2,7 @@ import torch
 from torch.utils.data import DataLoader
 import logging
 import os
+import argparse
 from datetime import datetime
 
 from dataset.video_dataset import load_video_dataset
@@ -13,7 +14,8 @@ BATCH_SIZE = 1
 CLIP_LENGTH = 16
 DIM_CHARACTERISTICS = 768
 SIZE_EPISODE = 3
-DEVICE = torch.device("cpu") #torch.device("cuda" if torch.cuda.is_available() else "cpu")
+# DEVICE = torch.device("cpu") #torch.device("cuda" if torch.cuda.is_available() else "cpu")
+DEVICE = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 BATCH_LOG_FREQ = 10
 DEBUG = True
 
@@ -238,8 +240,106 @@ def train_models(
         logging.getLogger("epoch").info(f"Epoch {epoch} done, hippocampus has {len(model_hippocampus)} memories")
     logging.info(f"Training controller finished at {datetime.now().strftime('%Y%m%d_%H%M%S')}")
 
+def train_models_periods (
+    data_loader: DataLoader,
+    model_mvit: EnhancedMViT,
+    model_pfc: PFC,
+    model_hippocampus: HippocampusRefactored,
+    model_subcortical_pathway: SubcorticalPathway,
+    model_controller: EvalController,
+    write_path: str = None
+):
+    """Trains the model
+    - Do not train MViT (use preloaded model)
+    - Train subcortical pathway on its own using given label
+    - Train controller and pre_eval in periods
+        - Train hippocampus to make pre_eval closer to eval2
+        - Train controller to make eval2 closer to real
+    Args:
+        video_path (str): _description_
+    """
+    timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
+    if write_path is None:
+        write_path = f"outs/train_{timestamp}"
+    os.makedirs(write_path)
+    logging.info(f"Training started at {timestamp}, writing to {write_path}")
+    model_mvit.eval()
+    model_pfc.train()
+    model_subcortical_pathway.train()
+    model_controller.train()
+    
+    EPOCHS = 50
+    PERIODS = 10
+    
+    # First train subcortical pathway
+    loss_eval1 = torch.nn.MSELoss()
+    optim_eval1 = torch.optim.Adam(model_subcortical_pathway.parameters(), lr=0.001)
+    for epoch in range(EPOCHS):
+        optim_eval1.zero_grad()
+        logging.getLogger("epoch").info(f"Epoch {epoch}/{EPOCHS}")
+        train_subcortical_pathway_epoch(data_loader, model_mvit, model_subcortical_pathway, loss_eval1, optim_eval1)
+        torch.save(model_subcortical_pathway.state_dict(), os.path.join(write_path, f"subcortical_pathway_{epoch}.pt"))
+        logging.getLogger("epoch").info(f"Epoch {epoch} done")
+    logging.info(f"Training Subcortical Pathway finished at {datetime.now().strftime('%Y%m%d_%H%M%S')}")
+    
+    # Then train pre_eval
+    model_subcortical_pathway.eval()
+    for period in range(PERIODS):
+        logging.getLogger("epoch").info(f"Period {period}/{PERIODS}")
+        loss_pfc = torch.nn.MSELoss()
+        optim_pre_eval = torch.optim.Adam(model_pfc.parameters(), lr=0.001)
+        for epoch in range(EPOCHS):
+            optim_pre_eval.zero_grad()
+            logging.getLogger("epoch").info(f"Epoch {epoch}/{EPOCHS}")
+            train_pre_eval_epoch(epoch, data_loader, model_mvit, model_pfc, model_hippocampus, loss_pfc, optim_pre_eval)
+            torch.save(model_pfc.state_dict(), os.path.join(write_path, f"pfc_{period}_{epoch}.pt"))
+            model_hippocampus.save_to_file(os.path.join(write_path, f"hippocampus_{period}_{epoch}.json"))
+            logging.getLogger("epoch").info(f"Epoch {epoch} of period {period} done, hippocampus has {len(model_hippocampus)} memories")
+        logging.getLogger("epoch").info(f"Period {period} done at {datetime.now().strftime('%Y%m%d_%H%M%S')}")
+        
+        model_hippocampus = HippocampusRefactored(
+            DIM_CHARACTERISTICS,
+            SIZE_EPISODE,
+            replay_rate=10,
+            episode_per_replay=5,
+            min_event_for_episode=5,
+        )
+        # Finally train controller
+        model_pfc.eval()
+        loss_controller = torch.nn.MSELoss()
+        optim_controller = torch.optim.Adam(model_controller.parameters(), lr=0.001)
+        for epoch in range(EPOCHS):
+            optim_controller.zero_grad()
+            logging.getLogger("epoch").info(f"Epoch {epoch+1}/{EPOCHS}")
+            train_controller_epoch(
+                data_loader,
+                model_mvit,
+                model_pfc,
+                model_hippocampus,
+                model_controller,
+                loss_controller,
+                optim_controller
+            )
+            torch.save(model_controller.state_dict(), os.path.join(write_path, f"controller_{period}_{epoch}.pt"))
+            logging.getLogger("epoch").info(f"Controller Epoch {epoch} of Period {period} done, hippocampus has {len(model_hippocampus)} memories")
+        logging.getLogger("epoch").info(f"Period {period} done at {datetime.now().strftime('%Y%m%d_%H%M%S')}")
+    logging.info(f"Training PFC and controller finished at {datetime.now().strftime('%Y%m%d_%H%M%S')}")
+
 if __name__ == "__main__":
-    logging.basicConfig(level=logging.WARNING, format='{asctime} [{levelname:.4}] {name}: {message}', style='{')
+    # set data-path and annotation-path
+    parser = argparse.ArgumentParser(description="Train a video model")
+    parser.add_argument('--data_dir', type=str, required=True, help='Path to the dataset directory')
+    parser.add_argument('--annotation_path', type=str, required=True, help='Path to the annotation file')
+    parser.add_argument('--out_dir', type=str, required=False, help='Path to the output directory', default=None)
+
+    # 引数を解析
+    args = parser.parse_args()
+    
+    logging.basicConfig(level=logging.WARNING, 
+                        format='{asctime} [{levelname:.4}] {name}: {message}', 
+                        style='{', 
+                        filename=args.log_path,
+                        filemode='a')
     if DEBUG:
         logging.getLogger().setLevel(logging.DEBUG)
         logging.getLogger("batch").setLevel(logging.DEBUG)
@@ -250,7 +350,8 @@ if __name__ == "__main__":
         logging.getLogger("batch").setLevel(logging.INFO)
         logging.getLogger("epoch").setLevel(logging.INFO)
     
-    train_loader = load_video_dataset("data/small_data/trainval", "annotation/params_trainval.csv", BATCH_SIZE, CLIP_LENGTH)
+    # train_loader = load_video_dataset("data/small_data/trainval", "annotation/params_trainval.csv", BATCH_SIZE, CLIP_LENGTH)
+    train_loader = load_video_dataset(args.data_dir, args.annotation_path, BATCH_SIZE, CLIP_LENGTH)
     model_mvit = EnhancedMViT(pretrained=True).to(device=DEVICE)
     model_pfc = PFC(DIM_CHARACTERISTICS, SIZE_EPISODE, 8).to(device=DEVICE)
     model_hippocampus = HippocampusRefactored(
@@ -262,22 +363,34 @@ if __name__ == "__main__":
     )
     model_subcortical_pathway = SubcorticalPathway().to(device=DEVICE)
     model_controller = EvalController().to(device=DEVICE)
-    # load_model(
-    #     model_pfc=model_pfc,
-    #     model_hippocampus=model_hippocampus,
-    #     model_subcortical_pathway=model_subcortical_pathway,
-    #     model_controller=model_controller,
-    #     id="0"
+    ## load_model(
+    ##     model_pfc=model_pfc,
+    ##     model_hippocampus=model_hippocampus,
+    ##     model_subcortical_pathway=model_subcortical_pathway,
+    ##     model_controller=model_controller,
+    ##     id="0"
+    ## )
+    ## model_hippocampus = HippocampusRefactored.load_from_file(f"./weights/hippocampus_{0}.pkl")
+    
+    # train_models(
+    #     train_loader,
+    #     model_mvit,
+    #     model_pfc,
+    #     model_hippocampus,
+    #     model_subcortical_pathway,
+    #     model_controller,
+    #     write_path=args.out_dir
     # )
-    # model_hippocampus = HippocampusRefactored.load_from_file(f"./weights/hippocampus_{0}.pkl")
-    train_models(
+    
+    train_models_periods(
         train_loader,
         model_mvit,
         model_pfc,
         model_hippocampus,
         model_subcortical_pathway,
-        model_controller
-   )
+        model_controller,
+        write_path=args.out_dir
+    )
     
     # save_model(
     #     model_pfc=model_pfc,
