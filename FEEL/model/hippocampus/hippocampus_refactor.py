@@ -112,9 +112,9 @@ class HippocampusRefactored():
     def get_ids(self) -> list[int]:
         return self.event_dataset._df.index.tolist()
     
-    def init_priority(self, event_id: int, eval1: torch.Tensor|float, method: Literal["base"] = "base"):
+    def init_priority(self, event_id: int, eval1: torch.Tensor|float, method: Literal["base"] = "base") -> float:
         if method == "base":
-            return torch.abs(eval1) + self.base_priority
+            return (torch.abs(eval1) + self.base_priority).item()
         else:
             raise NotImplementedError(f"Method {method} for Hippocampus.init_priority() is not defined.")
     
@@ -127,6 +127,8 @@ class HippocampusRefactored():
             eval2=new_eval2 if method=="replace" else None,
             rate=rate
         )
+        if new_priority is None or not isinstance(new_priority, float):
+            raise ValueError(f"Priority update failed: {new_priority}")
         return new_priority
     
     def update_queue(self, event_id: int, new_priority: float) -> None:
