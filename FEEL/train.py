@@ -10,7 +10,7 @@ from utils import timeit
 from model import EnhancedMViT, PFC, Hippocampus, HippocampusRefactored, SubcorticalPathway, EvalController
 # from save_and_load import load_model, save_model
 
-BATCH_SIZE = 1
+BATCH_SIZE = 20
 CLIP_LENGTH = 16
 DIM_CHARACTERISTICS = 768
 SIZE_EPISODE = 3
@@ -26,7 +26,9 @@ def eval2_to_eval1(eval2: torch.Tensor) -> torch.Tensor:
     Returns:
         torch.Tensor: Eval1 tensor
     """
-    return torch.tensor(((eval2[0]+eval2[1])/2 - (eval2[2]+eval2[4]+eval2[5]+eval2[6])/4) * (2+eval[3]+eval[7]) / 4)
+    if eval2.size(1) != 8:
+        raise ValueError(f"Invalid size of eval2: {eval2.size()}")
+    return torch.tensor(((eval2[:, 0]+eval2[:, 1])/2 - (eval2[:, 2]+eval2[:, 4]+eval2[:, 5]+eval2[:, 6])/4) * (2+eval2[:, 3]+eval2[:, 7]) / 4)
 
 def zero_padding(data: torch.Tensor, size:tuple) -> torch.Tensor:
     """Zero padding to make data size to size
@@ -261,7 +263,7 @@ def train_models_periods (
     timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
     if write_path is None:
         write_path = f"outs/train_{timestamp}"
-    os.makedirs(write_path)
+    os.makedirs(write_path, exist_ok=True)
     logging.info(f"Training started at {timestamp}, writing to {write_path}")
     model_mvit.eval()
     model_pfc.train()
