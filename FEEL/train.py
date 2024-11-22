@@ -7,6 +7,7 @@ from datetime import datetime
 from dataset.video_dataset import load_video_dataset
 from utils import timeit
 from model import EnhancedMViT, PFC, Hippocampus, HippocampusRefactored, SubcorticalPathway, EvalController
+from save_and_load import load_model, save_model
 
 BATCH_SIZE = 1
 CLIP_LENGTH = 16
@@ -246,6 +247,14 @@ if __name__ == "__main__":
     )
     model_subcortical_pathway = SubcorticalPathway().to(device=DEVICE)
     model_controller = EvalController().to(device=DEVICE)
+    # load_model(
+    #     model_pfc=model_pfc,
+    #     model_hippocampus=model_hippocampus,
+    #     model_subcortical_pathway=model_subcortical_pathway,
+    #     model_controller=model_controller,
+    #     id="0"
+    # )
+    # model_hippocampus = HippocampusRefactored.load_from_file(f"./weights/hippocampus_{0}.pkl")
     train_models(
         train_loader,
         model_mvit,
@@ -254,3 +263,11 @@ if __name__ == "__main__":
         model_subcortical_pathway,
         model_controller
    )
+    
+    # save_model(
+    #     model_pfc=model_pfc,
+    #     model_hippocampus=model_hippocampus,
+    #     model_subcortical_pathway=model_subcortical_pathway,
+    #     model_controller=model_controller,
+    #     id="0"
+    # )
