@@ -51,7 +51,8 @@ class EventDataset(Dataset):
     ):
         self._df = pd.DataFrame(
             data=[],
-            columns=["characteristics", "eval1", "eval2", "priority"]
+            columns=["characteristics", "eval1", "eval2", "priority"],
+            dtype=object
         )
         self._cast_type()
     
@@ -124,7 +125,11 @@ class EventDataset(Dataset):
             priority (Any): Priority, either in float, Tensor or ndarray
         """
         assert not self.has_id(id), ValueError(f"Data with id {id} already exists")
-        self._df.loc[id] = {"characteristics": characteristics, "eval1": eval1, "eval2": eval2, "priority": priority}
+        self._df.loc[id] = [None,None,None,None]
+        self._df.at[id, "characteristics"] = characteristics
+        self._df.at[id, "eval1"] = eval1
+        self._df.at[id, "eval2"] = eval2
+        self._df.at[id, "priority"] = priority
     
     def update_priority(self, id: int, method: Literal["rate", "replace"], eval1: torch.Tensor, rate: float=1.0) -> None:
         assert self.has_id(id), f"Data with id {id} does not exist"

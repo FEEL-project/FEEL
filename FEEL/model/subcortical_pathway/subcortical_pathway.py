@@ -10,14 +10,15 @@ class SubcorticalPathway(nn.Module):
         self.flatten = nn.Flatten()
         self.linear_relu_stack = nn.Sequential(
             nn.Linear(768, 512),
-            nn.ReLU(),
+            nn.ReLU(inplace=False),
             nn.Linear(512, 512),
-            nn.ReLU(),
+            nn.ReLU(inplace=False),
             nn.Linear(512, 1),
             nn.Tanh()   # [-1, 1]の範囲に正規化
         )
 
-    def forward(self, x):
+    def forward(self, x: torch.Tensor) -> torch.Tensor:
+        x = x.clone()
         x = self.flatten(x)
         logits = self.linear_relu_stack(x)
         return logits
