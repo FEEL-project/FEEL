@@ -1,22 +1,44 @@
 import torch
 from torch.utils.data import Dataset
-from typing import Literal, Any, TypeVar, Tuple, Callable, List
+from typing import Literal, Any, TypeVar, Tuple, Callable, List, Sequence, Iterable
 from dataclasses import dataclass
 import pandas as pd
 import numpy as np
 from functools import wraps
 
 T = TypeVar("T")
-
+DEVICE = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 @dataclass
 class EventData:
     """A simple wrapper for data acquired by EventDataset
     """
-    id: int
+    id: int | torch.Tensor
     characteristics: torch.Tensor
     eval1: torch.Tensor
     eval2: torch.Tensor
     priority: torch.Tensor
+    
+    def __len__(self):
+        if isinstance(self.id, int):
+            return 1
+        else:
+            return len(self.id)
+    
+    def __getitem__(self, idx: int) -> "EventData":
+        if isinstance(self.id, int):
+            return self
+        else:
+            return EventData(
+                self.id[idx].item(),
+                self.characteristics[idx],
+                self.eval1[idx],
+                self.eval2[idx],
+                self.priority[idx]
+            )
+    
+    def __iter__(self) -> Iterable["EventData"]:
+        for i in range(len(self)):
+            yield self[i]
 
 def _parse_event_data(fn: Callable[..., Tuple[int, torch.Tensor, float, torch.Tensor, float]]) -> Callable[..., EventData]:
     @wraps(fn)
@@ -28,7 +50,7 @@ def _parse_event_data(fn: Callable[..., Tuple[int, torch.Tensor, float, torch.Te
     return wrapper
 
 def event_data(obj_: Any) -> EventData:
-    if isinstance(obj_, tuple):
+    if isinstance(obj_, Sequence):
         return EventData(*obj_)
     elif isinstance(obj_, EventData):
         return obj_
@@ -60,7 +82,7 @@ class EventDataset(Dataset):
         return len(self._df.index)
     
     # @parse_event_data
-    def __getitem__(self, idx: int) -> Tuple[int, torch.Tensor, float, torch.Tensor, float]:
+    def __getitem__(self, idx: int) -> Tuple[int, torch.Tensor, torch.Tensor, torch.Tensor, torch.Tensor]:
         """Gets from dataset
 
         Args:
@@ -112,9 +134,9 @@ class EventDataset(Dataset):
         """
         if not self.has_id(id):
             raise ValueError(f"Data with id {id} does not exist")
-        del self._df.loc[id]
+        self._df.drop(id, inplace=True)
     
-    def add_item(self, id: int, characteristics: torch.Tensor, eval1: Any, eval2: torch.Tensor, priority: Any) -> None:
+    def add_item(self, id: int, characteristics: torch.Tensor, eval1: torch.Tensor, eval2: torch.Tensor, priority: torch.Tensor) -> None:
         """Adds item to dataset
 
         Args:
@@ -157,10 +179,10 @@ class EventDataset(Dataset):
         self._df.to_json(file_path, default_handler=handler)
     
     def _cast_type(self) -> None:
-        self._df["characteristics"] = self._df["characteristics"].astype(object).apply(torch.Tensor)
-        self._df["eval1"] = self._df["eval1"].astype(object).apply(torch.Tensor)
-        self._df["eval2"] = self._df["eval2"].astype(object).apply(torch.Tensor)
-        self._df["priority"] = self._df["priority"].astype(object).apply(lambda x: torch.Tensor([x]))
+        self._df["characteristics"] = self._df["characteristics"].astype(object).apply(lambda x: torch.Tensor(x).to(DEVICE))
+        self._df["eval1"] = self._df["eval1"].astype(object).apply(lambda x: torch.Tensor(x).to(DEVICE))
+        self._df["eval2"] = self._df["eval2"].astype(object).apply(lambda x: torch.Tensor(x).to(DEVICE))
+        self._df["priority"] = self._df["priority"].astype(object).apply(lambda x: torch.Tensor([x]).to(DEVICE))
     
     @classmethod
     def load_from_file(cls, file_path: str) -> "EventDataset":
@@ -172,4 +194,5 @@ class EventDataset(Dataset):
         self = cls()
         self._df = pd.read_json(file_path)
         self._cast_type()
+        print(self)
         return self

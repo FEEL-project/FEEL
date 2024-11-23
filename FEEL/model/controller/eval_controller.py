@@ -26,6 +26,8 @@ class EvalController(nn.Module):
         primary (evaluation1): output of Subcortical-Pathway 
         pref_cortex (pre-evaluation): output of prefrontal-cortex(前頭前野)
         """
+        import logging
+        logging.warning(f"primary: {primary.shape}, pref_cortex: {pref_cortex.shape}")
         input = torch.cat((primary, pref_cortex), dim=1)
         out = self.linear_stack(input)
         return out
