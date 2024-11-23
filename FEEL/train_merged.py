@@ -454,7 +454,6 @@ if __name__ == "__main__":
     
     train_models(
         train_loader,
-        model_subcortical_pathway,
         model_pfc,
         model_hippocampus,
         model_subcortical_pathway,

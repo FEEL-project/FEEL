@@ -11,7 +11,7 @@ import logging
 
 DEVICE = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 USE_DATASET_CACHE = True # Whether to load from cache instead of processing video every time
-VIDEO_DATASET_PATH = "/home/u01230/SoccerNarration/FEEL/dataset/video_dataset.json" # Path to save/load dataset cache
+VIDEO_DATASET_PATH = "dataset/splitted_TrainVal.json" # Path to save/load dataset cache
 
 class VideoDataset(Dataset):
     def __init__(self, inputs, labels, names,clip_length, frame_size=(224, 224)):
@@ -137,7 +137,6 @@ def load_video_dataset(video_dir: str, label_path: str, batch_size: int, clip_le
             with torch.no_grad():
                 _,input,_ = mvit(input)
             input = input.squeeze(0)
-            print(input.shape)
             inputs.append(input)
             labels.append(label_df[video_file.name])
             names.append(video_file.name)
