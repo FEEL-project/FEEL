@@ -24,10 +24,7 @@ class PFCPositionalEncoding(nn.Module):
         Returns:
             torch.Tensor: Returns Positional-encoded Tensor
         """
-        print(f"PFCPositionalEncoding: x.shape={x.shape}, \nvalue={x}")
-        print(f"PFCPositionalEncoding: pe.shape={self.pe[:x.size(0)].shape}, \nvalue={self.pe[:x.size(0)]}")
         x = x + self.pe[:x.size(0)]
-        print(f"PFCPositionalEncoding: x+pe.shape={x.shape}, \nvalue={x}")
         return self.dropout(x)
 
 class PFC(nn.Module):

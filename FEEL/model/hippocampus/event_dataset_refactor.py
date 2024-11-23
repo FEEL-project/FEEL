@@ -1,6 +1,6 @@
 import torch
 from torch.utils.data import Dataset
-from typing import Literal, Any, TypeVar, Tuple, Callable
+from typing import Literal, Any, TypeVar, Tuple, Callable, List
 from dataclasses import dataclass
 import pandas as pd
 import numpy as np
@@ -18,7 +18,7 @@ class EventData:
     eval2: torch.Tensor
     priority: torch.Tensor
 
-def _parse_event_data(fn: Callable[T, Tuple[int, torch.Tensor, float, torch.Tensor, float]]) -> Callable[T, EventData]:
+def _parse_event_data(fn: Callable[..., Tuple[int, torch.Tensor, float, torch.Tensor, float]]) -> Callable[..., EventData]:
     @wraps(fn)
     def wrapper(*args, **kwargs):
         res = fn(*args, **kwargs)
@@ -51,7 +51,8 @@ class EventDataset(Dataset):
     ):
         self._df = pd.DataFrame(
             data=[],
-            columns=["characteristics", "eval1", "eval2", "priority"]
+            columns=["characteristics", "eval1", "eval2", "priority"],
+            dtype=object
         )
         self._cast_type()
     
@@ -71,7 +72,7 @@ class EventDataset(Dataset):
         row = self._df.iloc[idx]
         return row.name, row["characteristics"], row["eval1"], row["eval2"], row["priority"]
     
-    def get_priority(self) -> list:
+    def get_priority(self) -> List[float]:
         """Returns a tensor of priority
 
         Returns:
@@ -124,9 +125,13 @@ class EventDataset(Dataset):
             priority (Any): Priority, either in float, Tensor or ndarray
         """
         assert not self.has_id(id), ValueError(f"Data with id {id} already exists")
-        self._df.loc[id] = {"characteristics": characteristics, "eval1": eval1, "eval2": eval2, "priority": priority}
+        self._df.loc[id] = [None,None,None,None]
+        self._df.at[id, "characteristics"] = characteristics
+        self._df.at[id, "eval1"] = eval1
+        self._df.at[id, "eval2"] = eval2
+        self._df.at[id, "priority"] = priority
     
-    def update_priority(self, id: int, method: Literal["rate", "replace"], eval1: torch.Tensor, rate: float=1.0) -> None:
+    def update_priority(self, id: int, method: Literal["rate", "replace"], eval1: torch.Tensor, rate: float=1.0) -> float:
         assert self.has_id(id), f"Data with id {id} does not exist"
         if method == "rate":
             self._df.at[id, "priority"] += rate * torch.norm(self._df.at[id, "eval2"])
@@ -134,6 +139,7 @@ class EventDataset(Dataset):
             self._df.at[id, "priority"] = eval1
         else:
             raise TypeError(f"Unsupported method for update_priority(): {method}")
+        return self._df.at[id, "priority"].item()
     
     def save_to_file(self, file_path: str) -> None:
         """Save dataset to file

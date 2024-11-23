@@ -2,14 +2,13 @@ import torch
 import torch.linalg
 import torch.nn as nn
 from torch.utils.data import WeightedRandomSampler, DataLoader, Sampler
-from typing import Literal, Generator, Tuple, Sequence, Any
+from typing import Literal, Generator, Tuple, Sequence, Any, List, Union
 from queue import PriorityQueue
 import os
 import json
 
 from .database import VectorDatabase
 from .event_dataset_refactor import EventDataset, EventData, event_data
-
 class Counter():
     """A class representing a counter
     """
@@ -50,7 +49,7 @@ class HippocampusRefactored():
     
     # Priority
     base_priority: float
-    priority_method: tuple[Literal["base"], Literal["rate"]] = ("base", "rate")
+    priority_method: Tuple[Literal["base"], Literal["rate"]] = ("base", "rate")
     priority_queue: PriorityQueue
     
     # Generator
@@ -110,26 +109,44 @@ class HippocampusRefactored():
     def __len__(self) -> int:
         return len(self.event_dataset)
     
-    def get_ids(self) -> list[int]:
+    def get_ids(self) -> List[int]:
         return self.event_dataset._df.index.tolist()
     
-    def init_priority(self, event_id: int, eval1: torch.Tensor|float, method: Literal["base"] = "base"):
+    def init_priority(self, event_id: int, eval1: Union[torch.Tensor, float], method: Literal["base"] = "base") -> float:
         if method == "base":
-            return torch.abs(eval1) + self.base_priority
+            return (torch.abs(eval1) + self.base_priority).item()
         else:
             raise NotImplementedError(f"Method {method} for Hippocampus.init_priority() is not defined.")
     
-    def update_priority(self, event_id: int, method: Literal["rate", "replace"] = "rate", new_eval2: torch.Tensor = None, rate: float = 1.0):
+    def update_priority(self, event_id: int, method: Literal["rate", "replace"] = "rate", new_eval2: torch.Tensor = None, rate: float = 1.0) -> float:
         if method == "replace" and new_eval2 is None:
             raise ValueError("new_eval2 must be provided when method is replace")
-        self.event_dataset.update_priority(
+        new_priority = self.event_dataset.update_priority(
             id=event_id,
             method=method,
             eval2=new_eval2 if method=="replace" else None,
             rate=rate
         )
+        if new_priority is None or not isinstance(new_priority, float):
+            raise ValueError(f"Priority update failed: {new_priority}")
+        return new_priority
     
-    def sample(self, batch_size: int = 1) -> Tuple[torch.Tensor, torch.Tensor, torch.Tensor, torch.Tensor, torch.Tensor] | None:
+    def update_queue(self, event_id: int, new_priority: float) -> None:
+        """Reorganizes priority queue for priority update
+        """
+        tmp_list = []
+        
+        while not self.priority_queue.empty():
+            item = self.priority_queue.get()
+            if item[0] == event_id:
+                tmp_list.append((event_id, new_priority))
+            else:
+                tmp_list.append(item)
+        
+        for item in tmp_list:
+            self.priority_queue.put(item)
+    
+    def sample(self, batch_size: int = 1) -> Union[Tuple[torch.Tensor, torch.Tensor, torch.Tensor, torch.Tensor, torch.Tensor], None]:
         """Generates a sample from stored data
 
         Args:
@@ -158,7 +175,7 @@ class HippocampusRefactored():
         """
         return self.event_dataset.get_by_id(event_id)
     
-    def search(self, k: int = 5, event_id: int = -1, characteristics: torch.Tensor|None = None) -> list[Tuple[int, float]]:
+    def search(self, k: int = 5, event_id: int = -1, characteristics: Union[torch.Tensor, None] = None) -> List[Tuple[int, float]]:
         """Get a memory similar to that of the given event id
 
         Args:
@@ -203,8 +220,9 @@ class HippocampusRefactored():
         ids, characteristics, eval1s, eval2s, _ = events
         # Refresh priority
         for i, event_id in enumerate(ids):
-            self.event_dataset.update_priority(event_id, self.priority_method[1], eval1=eval1s[i])
+            new_priority = self.event_dataset.update_priority(event_id, self.priority_method[1], eval1=eval1s[i])
             self.times_replayed += 1
+            self.update_queue(event_id, new_priority)
             if self.times_replayed % self.loss_freq == 0 or len(self) > self.max_len_dataset:
                 self.organize_memory()
         return event_data(events)
@@ -244,8 +262,8 @@ class HippocampusRefactored():
             episode.append(characteristics)
         for i, id in enumerate(associated_id):
             priority = associated_priority[i]
-            self.event_dataset.update_priority(id, self.priority_method[1], eval1=priority, rate=0.5)
-        print("episode", [e.shape for e in episode])
+            new_priority = self.event_dataset.update_priority(id, self.priority_method[1], eval1=priority, rate=0.5)
+            self.update_queue(id, new_priority)
         return torch.stack(episode)
     
     def generate_episodes_batch(self, event_ids: Sequence[int] = None, events: Sequence[EventData] = None, characteristics: Sequence[torch.Tensor] = None, batch_size: int = None):
@@ -294,7 +312,7 @@ class HippocampusRefactored():
         else:
             raise ValueError("No event or characteristics was found")
     
-    def receive(self, characteristics: torch.Tensor, eval1: torch.Tensor, batch_size: int|None = None) -> list[EventData]:
+    def receive(self, characteristics: torch.Tensor, eval1: torch.Tensor, batch_size: Union[int, None] = None) -> List[EventData]:
         """Receives a batch of data and creates ids
 
         Args:

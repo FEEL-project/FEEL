@@ -12,7 +12,7 @@ class VideoDataset(Dataset):
         self.paths = paths
         # 正解ラベルのリストをテンソルに変換
         self.labels = labels
-        self.labels = torch.tensor(self.labels)
+        self.labels = torch.stack(self.labels)
         # サンプリングするフレームクリップ数
         self.clip_length = clip_length
         # フレームのリサイズサイズ
