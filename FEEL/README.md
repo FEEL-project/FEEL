@@ -47,3 +47,23 @@ python3 runner.py --config config/random_input.yaml
 ```
 
 ### train
+
+```sh
+train_merged.py [-h] --data_dir DATA_DIR --annotation_path
+                       ANNOTATION_PATH [--out_dir OUT_DIR]
+                       [--subcortical_pathway SUBCORTICAL_PATHWAY]
+                       [--hippocampus HIPPOCAMPUS] [--pfc PFC]
+                       [--controller CONTROLLER]
+                       [--subcortical_pathway_train SUBCORTICAL_PATHWAY_TRAIN]
+                       [--pfc_controller_train PFC_CONTROLLER_TRAIN]
+                       [--no-debug] [--no-video-cache]
+                       [--log-frequency LOG_FREQUENCY]
+                       [--batch-size BATCH_SIZE] [--epoch EPOCH]
+                       [--episode-size EPISODE_SIZE]
+                       [--video-cache VIDEO_CACHE]
+```
+
+-   `log-frequency` defines how often the log for batches should occur.
+-   `batch-size` defines batch size
+-   `epoch` defines number of epoch
+-   `video-cache` defines the cache file of video

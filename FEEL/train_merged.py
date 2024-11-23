@@ -14,11 +14,13 @@ BATCH_SIZE = 20
 EPOCHS = 50
 CLIP_LENGTH = 16
 DIM_CHARACTERISTICS = 768
-SIZE_EPISODE = 3
 # DEVICE = torch.device("cpu") #torch.device("cuda" if torch.cuda.is_available() else "cpu")
 DEVICE = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-BATCH_LOG_FREQ = 10
 DEBUG = True
+SIZE_EPISODE = 3
+BATCH_SIZE = 20
+BATCH_LOG_FREQ = 10
+EPOCHS = 10
 
 def eval2_to_eval1(eval2: torch.Tensor) -> torch.Tensor:
     """Convert eval2 to eval1
@@ -71,7 +73,7 @@ def train_subcortical_pathway_epoch(
         loss.backward()
         optim.step()
         losses.append(loss)
-        if i % BATCH_LOG_FREQ == 0:
+        if BATCH_LOG_FREQ and i % BATCH_LOG_FREQ == 0:
             logging.getLogger("batch").debug(f"Iteration {i}: loss {loss}")
     logging.info(f"Average loss for epoch: {sum(losses)/len(losses)}")
 
@@ -110,7 +112,7 @@ def train_pre_eval_epoch(
         loss.backward()
         optim.step()
         losses.append(loss)
-        if i % BATCH_LOG_FREQ == 0:
+        if BATCH_LOG_FREQ and i % BATCH_LOG_FREQ == 0:
             logging.getLogger("batch").debug(f"Iteration {i}: loss {loss}")
         if epoch==0:
             cnt = 0
@@ -158,7 +160,7 @@ def train_controller_epoch(
         loss.backward()
         optim.step()
         losses.append(loss)
-        if i % BATCH_LOG_FREQ == 0:
+        if BATCH_LOG_FREQ and i % BATCH_LOG_FREQ == 0:
             logging.getLogger("batch").debug(f"Iteration {i}: loss {loss}")
     logging.info(f"Average loss for epoch: {sum(losses)/len(losses)}")
 
@@ -211,7 +213,7 @@ def train_pfc_controller_epoch(
         optim_controller.step()
         losses_2_to_label.append(loss_2_to_label)
         losses_2_to_pre.append(loss_2_to_pre)
-        if i % BATCH_LOG_FREQ == 0:
+        if BATCH_LOG_FREQ and i % BATCH_LOG_FREQ == 0:
             logging.getLogger("batch").debug(f"Iteration {i}: loss (eval2 to eval2_label) {loss_2_to_label}, loss (eval2 to pre_eval) {loss_2_to_pre}")
         if epoch==0:
             cnt = 0
@@ -323,7 +325,6 @@ def train_models(
     model_subcortical_pathway.train()
     model_controller.train()
     
-    # EPOCHS = 10
     
     # First train subcortical pathway
     if subcortical_pathway_train:
@@ -381,7 +382,7 @@ def train_models(
         logging.getLogger("epoch").info(f"Epoch {epoch} done, hippocampus has {len(model_hippocampus)} memories")
     logging.info(f"Training PFC and Controller finished at {datetime.now().strftime('%Y%m%d_%H%M%S')}")
 
-
+    
 if __name__ == "__main__":
     # set data-path and annotation-path
     parser = argparse.ArgumentParser(description="Train a video model")
@@ -395,9 +396,21 @@ if __name__ == "__main__":
     parser.add_argument('--subcortical_pathway_train', type=bool, required=False, help='Train the subcortical pathway', default=True)
     parser.add_argument('--pfc_controller_train', type=bool, required=False, help='Train the PFC and controller', default=True)
     parser.add_argument('--replay', type=bool, required=False, help='Use replay in hippocampus', default=False)
-
+    parser.add_argument('--no-debug', action='store_false', help='Enable debug logging')
+    parser.add_argument('--no-video-cache', action='store_false', help='Disable video cache')
+    parser.add_argument('--log-frequency', type=int, required=False, help='Log frequency', default=10)
+    parser.add_argument('--batch-size', type=int, required=False, help='Batch size', default=20)
+    parser.add_argument('--epoch', type=int, required=False, help='Number of epochs to run', default=20)
+    parser.add_argument('--episode-size', type=int, required=False, help='Number of epochs to run', default=3)
+    parser.add_argument('--video-cache', type=str, required=False, help='Video cache', default=None)
+    
     # 引数を解析
     args = parser.parse_args()
+    DEBUG = args.no_debug
+    BATCH_LOG_FREQ = args.log_frequency
+    BATCH_SIZE = args.batch_size
+    EPOCHS = args.epoch
+    SIZE_EPISODE = args.episode_size
     
     timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
     logging.basicConfig(level=logging.WARNING, 
@@ -417,7 +430,15 @@ if __name__ == "__main__":
 
     model_mvit = EnhancedMViT(pretrained=True).to(device=DEVICE)
     # train_loader = load_video_dataset("data/small_data/trainval", "annotation/params_trainval.csv", BATCH_SIZE, CLIP_LENGTH)
-    train_loader = load_video_dataset(args.data_dir, args.annotation_path, BATCH_SIZE, CLIP_LENGTH, model_mvit)
+    train_loader = load_video_dataset(
+        args.data_dir,
+        args.annotation_path,
+        BATCH_SIZE,
+        CLIP_LENGTH,
+        model_mvit,
+        args.no_video_cache,
+        cache_path=args.video_cache
+    )
     model_pfc = PFC(DIM_CHARACTERISTICS, SIZE_EPISODE, 8).to(device=DEVICE)
     if args.pfc is not None:
         model_pfc.load_state_dict(torch.load(args.pfc, map_location=DEVICE))
@@ -441,14 +462,6 @@ if __name__ == "__main__":
     model_controller = EvalController().to(device=DEVICE)
     if args.controller is not None:
         model_controller.load_state_dict(torch.load(args.controller, map_location=DEVICE))
-    ## load_model(
-    ##     model_pfc=model_pfc,
-    ##     model_hippocampus=model_hippocampus,
-    ##     model_subcortical_pathway=model_subcortical_pathway,
-    ##     model_controller=model_controller,
-    ##     id="0"
-    ## )
-    ## model_hippocampus = HippocampusRefactored.load_from_file(f"./weights/hippocampus_{0}.pkl")
     
     train_models(
         train_loader,
@@ -461,11 +474,3 @@ if __name__ == "__main__":
         pfc_controller_train=args.pfc_controller_train,
         replay=args.replay
     )
-    
-    # save_model(
-    #     model_pfc=model_pfc,
-    #     model_hippocampus=model_hippocampus,
-    #     model_subcortical_pathway=model_subcortical_pathway,
-    #     model_controller=model_controller,
-    #     id="0"
-    # )
