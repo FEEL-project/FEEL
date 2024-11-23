@@ -11,6 +11,7 @@ from model import EnhancedMViT, PFC, Hippocampus, HippocampusRefactored, Subcort
 # from save_and_load import load_model, save_model
 
 BATCH_SIZE = 20
+EPOCHS = 50
 CLIP_LENGTH = 16
 DIM_CHARACTERISTICS = 768
 SIZE_EPISODE = 3
@@ -28,7 +29,7 @@ def eval2_to_eval1(eval2: torch.Tensor) -> torch.Tensor:
     """
     if eval2.size(1) != 8:
         raise ValueError(f"Invalid size of eval2: {eval2.size()}")
-    if isinstance(eval2, torch.Tensor):
+    if not isinstance(eval2, torch.Tensor):
         raise ValueError(f"eval2 is not a tensor: {eval2}")
     ret = ((eval2[:, 0]+eval2[:, 1])/2 - (eval2[:, 2]+eval2[:, 4]+eval2[:, 5]+eval2[:, 6])/4) * (2+eval2[:, 3]+eval2[:, 7]) / 4
     ret = ret.unsqueeze(1)
@@ -276,6 +277,20 @@ def train_pfc_controller_epoch_with_replay(
             for event in events:
                 model_hippocampus.save_to_memory(event=event, eval1=eval1[cnt], eval2=labels_eval2[cnt])
                 cnt += 1
+        if epoch % model_hippocampus.replay_rate == 0 and epoch > 0:
+            optim_pfc.zero_grad()
+            optim_controller.zero_grad()
+            events = model_hippocampus.replay()
+            episode = model_hippocampus.generate_episodes_batch(events=events)
+            pre_eval = model_pfc(episode.transpose(0, 1))
+            out_eval2 = model_controller(eval1, pre_eval)
+            loss_2_to_label = loss_maximization(out_eval2, labels_eval2)
+            loss_2_to_pre = loss_expectation(pre_eval, out_eval2)
+            loss_2_to_label.backward(retain_graph=True)
+            loss_2_to_pre.backward()
+            optim_pfc.step()
+            optim_controller.step()
+            logging.getLogger("batch").debug(f"Replay at epoch {epoch}: loss (eval2 to eval2_label) {loss_2_to_label}, loss (eval2 to pre_eval) {loss_2_to_pre}")
     logging.info(f"Average loss for epoch (eval2 to eval2_label): {sum(losses_2_to_label)/len(losses_2_to_label)}")
     logging.info(f"Average loss for epoch (eval2 to pre_eval): {sum(losses_2_to_pre)/len(losses_2_to_pre)}")
 
@@ -288,6 +303,7 @@ def train_models(
     write_path: str = None,
     subcortical_pathway_train: bool = True,
     pfc_controller_train: bool = True,
+    replay: bool = False
 ):
     """Trains the model
     - Do not train MViT (use preloaded model)
@@ -300,14 +316,14 @@ def train_models(
     timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
     if write_path is None:
         write_path = f"outs/train_{timestamp}"
-    os.makedirs(write_path)
+    os.makedirs(write_path, exist_ok=True)
     logging.info(f"Training started at {timestamp}, writing to {write_path}")
     logging.info(f"Device is {DEVICE}")
     model_pfc.train()
     model_subcortical_pathway.train()
     model_controller.train()
     
-    EPOCHS = 10
+    # EPOCHS = 10
     
     # First train subcortical pathway
     if subcortical_pathway_train:
@@ -333,115 +349,37 @@ def train_models(
         optim_pre_eval.zero_grad()
         optim_controller.zero_grad()
         logging.getLogger("epoch").info(f"Epoch {epoch}/{EPOCHS}")
-        train_pfc_controller_epoch(
-            epoch,
-            data_loader,
-            model_subcortical_pathway,
-            model_pfc,
-            model_hippocampus,
-            model_controller,
-            loss_pfc,
-            optim_pre_eval,
-            loss_controller,
-            optim_controller
-        )
-        torch.save(model_pfc.state_dict(), os.path.join(write_path, f"pfc_{epoch}.pt"))
-        torch.save(model_controller.state_dict(), os.path.join(write_path, f"controller_{epoch}.pt"))
-        model_hippocampus.save_to_file(os.path.join(write_path, f"hippocampus_{epoch}.json"))
-        logging.getLogger("epoch").info(f"Epoch {epoch} done, hippocampus has {len(model_hippocampus)} memories")
-    logging.info(f"Training PFC and Controller finished at {datetime.now().strftime('%Y%m%d_%H%M%S')}")
-
-def train_models_periods (
-    data_loader: DataLoader,
-    model_pfc: PFC,
-    model_hippocampus: HippocampusRefactored,
-    model_subcortical_pathway: SubcorticalPathway,
-    model_controller: EvalController,
-    write_path: str = None,
-    subcortical_pathway_train: bool = True,
-    pfc_controller_train: bool = True,
-):
-    """Trains the model
-    - Do not train MViT (use preloaded model)
-    - Train subcortical pathway on its own using given label
-    - Train controller and pre_eval in periods
-        - Train hippocampus to make pre_eval closer to eval2
-        - Train controller to make eval2 closer to real
-    Args:
-        video_path (str): _description_
-    """
-    timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
-    if write_path is None:
-        write_path = f"outs/train_{timestamp}"
-    os.makedirs(write_path, exist_ok=True)
-    logging.info(f"Training started at {timestamp}, writing to {write_path}")
-    logging.info(f"Device is {DEVICE}")
-    model_pfc.train()
-    model_subcortical_pathway.train()
-    model_controller.train()
-    
-    EPOCHS = 50
-    PERIODS = 10
-    
-    # First train subcortical pathway
-    if subcortical_pathway_train:
-        loss_eval1 = torch.nn.MSELoss()
-        optim_eval1 = torch.optim.Adam(model_subcortical_pathway.parameters(), lr=0.001)
-        for epoch in range(EPOCHS):
-            optim_eval1.zero_grad()
-            logging.getLogger("epoch").info(f"Epoch {epoch}/{EPOCHS}")
-            train_subcortical_pathway_epoch(data_loader, model_subcortical_pathway, loss_eval1, optim_eval1)
-            torch.save(model_subcortical_pathway.state_dict(), os.path.join(write_path, f"subcortical_pathway_{epoch}.pt"))
-            logging.getLogger("epoch").info(f"Epoch {epoch} done")
-        logging.info(f"Training Subcortical Pathway finished at {datetime.now().strftime('%Y%m%d_%H%M%S')}")
-    
-    # Then train pre_eval and controller in periods
-    if not pfc_controller_train:
-        return
-    model_subcortical_pathway.eval()
-    for period in range(PERIODS):
-        # Train pre_eval
-        logging.getLogger("epoch").info(f"Period {period}/{PERIODS}")
-        loss_pfc = torch.nn.MSELoss()
-        optim_pre_eval = torch.optim.Adam(model_pfc.parameters(), lr=0.001)
-        for epoch in range(EPOCHS):
-            optim_pre_eval.zero_grad()
-            logging.getLogger("epoch").info(f"Epoch {epoch}/{EPOCHS}")
-            train_pre_eval_epoch(epoch, data_loader, model_subcortical_pathway, model_pfc, model_hippocampus, loss_pfc, optim_pre_eval)
-            torch.save(model_pfc.state_dict(), os.path.join(write_path, f"pfc_{period}_{epoch}.pt"))
-            model_hippocampus.save_to_file(os.path.join(write_path, f"hippocampus_{period}_{epoch}.json"))
-            logging.getLogger("epoch").info(f"Epoch {epoch} of period {period} done, hippocampus has {len(model_hippocampus)} memories")
-        logging.getLogger("epoch").info(f"Period {period} done at {datetime.now().strftime('%Y%m%d_%H%M%S')}")
-        
-        # model_hippocampus = HippocampusRefactored(
-        #     DIM_CHARACTERISTICS,
-        #     SIZE_EPISODE,
-        #     replay_rate=10,
-        #     episode_per_replay=5,
-        #     min_event_for_episode=5,
-        # )
-        
-        # Finally train controller
-        model_pfc.eval()
-        loss_controller = torch.nn.MSELoss()
-        optim_controller = torch.optim.Adam(model_controller.parameters(), lr=0.001)
-        for epoch in range(EPOCHS):
-            optim_controller.zero_grad()
-            logging.getLogger("epoch").info(f"Epoch {epoch+1}/{EPOCHS}")
-            train_controller_epoch(
+        if replay:
+            train_pfc_controller_epoch_with_replay(
+                epoch,
                 data_loader,
                 model_subcortical_pathway,
                 model_pfc,
                 model_hippocampus,
                 model_controller,
+                loss_pfc,
+                optim_pre_eval,
                 loss_controller,
                 optim_controller
             )
-            torch.save(model_controller.state_dict(), os.path.join(write_path, f"controller_{period}_{epoch}.pt"))
-            logging.getLogger("epoch").info(f"Controller Epoch {epoch} of Period {period} done, hippocampus has {len(model_hippocampus)} memories")
-        logging.getLogger("epoch").info(f"Period {period} done at {datetime.now().strftime('%Y%m%d_%H%M%S')}")
-    logging.info(f"Training PFC and controller finished at {datetime.now().strftime('%Y%m%d_%H%M%S')}")
-
+        else:
+            train_pfc_controller_epoch(
+                epoch,
+                data_loader,
+                model_subcortical_pathway,
+                model_pfc,
+                model_hippocampus,
+                model_controller,
+                loss_pfc,
+                optim_pre_eval,
+                loss_controller,
+                optim_controller
+            )
+        torch.save(model_pfc.state_dict(), os.path.join(write_path, f"pfc_{epoch}.pt"))
+        torch.save(model_controller.state_dict(), os.path.join(write_path, f"controller_{epoch}.pt"))
+        model_hippocampus.save_to_file(os.path.join(write_path, f"hippocampus_{epoch}.json"))
+        logging.getLogger("epoch").info(f"Epoch {epoch} done, hippocampus has {len(model_hippocampus)} memories")
+    logging.info(f"Training PFC and Controller finished at {datetime.now().strftime('%Y%m%d_%H%M%S')}")
 
 
 if __name__ == "__main__":
@@ -456,6 +394,7 @@ if __name__ == "__main__":
     parser.add_argument('--controller', type=str, required=False, help='Path to the controller model', default=None)
     parser.add_argument('--subcortical_pathway_train', type=bool, required=False, help='Train the subcortical pathway', default=True)
     parser.add_argument('--pfc_controller_train', type=bool, required=False, help='Train the PFC and controller', default=True)
+    parser.add_argument('--replay', type=bool, required=False, help='Use replay in hippocampus', default=False)
 
     # 引数を解析
     args = parser.parse_args()
@@ -489,9 +428,10 @@ if __name__ == "__main__":
         model_hippocampus = HippocampusRefactored(
             DIM_CHARACTERISTICS,
             SIZE_EPISODE,
-            replay_rate=10,
+            replay_rate=EPOCHS//5,
             episode_per_replay=5,
             min_event_for_episode=5,
+            min_event_for_replay=20
         )
     
     model_subcortical_pathway = SubcorticalPathway().to(device=DEVICE)
@@ -518,20 +458,9 @@ if __name__ == "__main__":
         model_controller,
         write_path=args.out_dir,
         subcortical_pathway_train=args.subcortical_pathway_train,
-        pfc_controller_train=args.pfc_controller_train
+        pfc_controller_train=args.pfc_controller_train,
+        replay=args.replay
     )
-    
-    # train_models_periods(
-    #     train_loader,
-    #     model_subcortical_pathway,
-    #     model_pfc,
-    #     model_hippocampus,
-    #     model_subcortical_pathway,
-    #     model_controller,
-    #     write_path=args.out_dir,
-    #     subcortical_pathway_train=args.subcortical_pathway_train,
-    #     pfc_controller_train=args.pfc_controller_train
-    # )
     
     # save_model(
     #     model_pfc=model_pfc,
