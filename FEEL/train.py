@@ -171,7 +171,9 @@ def train_models(
     model_hippocampus: HippocampusRefactored,
     model_subcortical_pathway: SubcorticalPathway,
     model_controller: EvalController,
-    write_path: str = None
+    write_path: str = None,
+    subcortical_pathway_train: bool = True,
+    pfc_controller_train: bool = True,
 ):
     """Trains the model
     - Do not train MViT (use preloaded model)
@@ -195,16 +197,19 @@ def train_models(
     EPOCHS = 10
     
     # First train subcortical pathway
-    loss_eval1 = torch.nn.MSELoss()
-    optim_eval1 = torch.optim.Adam(model_subcortical_pathway.parameters(), lr=0.001)
-    for epoch in range(EPOCHS):
-        optim_eval1.zero_grad()
-        logging.getLogger("epoch").info(f"Epoch {epoch}/{EPOCHS}")
-        train_subcortical_pathway_epoch(data_loader, model_mvit, model_subcortical_pathway, loss_eval1, optim_eval1)
-        torch.save(model_subcortical_pathway.state_dict(), os.path.join(write_path, f"subcortical_pathway_{epoch}.pt"))
-        logging.getLogger("epoch").info(f"Epoch {epoch} done")
-    logging.info(f"Training Subcortical Pathway finished at {datetime.now().strftime('%Y%m%d_%H%M%S')}")
+    if subcortical_pathway_train:
+        loss_eval1 = torch.nn.MSELoss()
+        optim_eval1 = torch.optim.Adam(model_subcortical_pathway.parameters(), lr=0.001)
+        for epoch in range(EPOCHS):
+            optim_eval1.zero_grad()
+            logging.getLogger("epoch").info(f"Epoch {epoch}/{EPOCHS}")
+            train_subcortical_pathway_epoch(data_loader, model_mvit, model_subcortical_pathway, loss_eval1, optim_eval1)
+            torch.save(model_subcortical_pathway.state_dict(), os.path.join(write_path, f"subcortical_pathway_{epoch}.pt"))
+            logging.getLogger("epoch").info(f"Epoch {epoch} done")
+        logging.info(f"Training Subcortical Pathway finished at {datetime.now().strftime('%Y%m%d_%H%M%S')}")
     
+    if not pfc_controller_train:
+        return
     # Then train pre_eval
     model_subcortical_pathway.eval()
     loss_pfc = torch.nn.MSELoss()
@@ -252,7 +257,9 @@ def train_models_periods (
     model_hippocampus: HippocampusRefactored,
     model_subcortical_pathway: SubcorticalPathway,
     model_controller: EvalController,
-    write_path: str = None
+    write_path: str = None,
+    subcortical_pathway_train: bool = True,
+    pfc_controller_train: bool = True,
 ):
     """Trains the model
     - Do not train MViT (use preloaded model)
@@ -278,19 +285,23 @@ def train_models_periods (
     PERIODS = 10
     
     # First train subcortical pathway
-    loss_eval1 = torch.nn.MSELoss()
-    optim_eval1 = torch.optim.Adam(model_subcortical_pathway.parameters(), lr=0.001)
-    for epoch in range(EPOCHS):
-        optim_eval1.zero_grad()
-        logging.getLogger("epoch").info(f"Epoch {epoch}/{EPOCHS}")
-        train_subcortical_pathway_epoch(data_loader, model_mvit, model_subcortical_pathway, loss_eval1, optim_eval1)
-        torch.save(model_subcortical_pathway.state_dict(), os.path.join(write_path, f"subcortical_pathway_{epoch}.pt"))
-        logging.getLogger("epoch").info(f"Epoch {epoch} done")
-    logging.info(f"Training Subcortical Pathway finished at {datetime.now().strftime('%Y%m%d_%H%M%S')}")
+    if subcortical_pathway_train:
+        loss_eval1 = torch.nn.MSELoss()
+        optim_eval1 = torch.optim.Adam(model_subcortical_pathway.parameters(), lr=0.001)
+        for epoch in range(EPOCHS):
+            optim_eval1.zero_grad()
+            logging.getLogger("epoch").info(f"Epoch {epoch}/{EPOCHS}")
+            train_subcortical_pathway_epoch(data_loader, model_mvit, model_subcortical_pathway, loss_eval1, optim_eval1)
+            torch.save(model_subcortical_pathway.state_dict(), os.path.join(write_path, f"subcortical_pathway_{epoch}.pt"))
+            logging.getLogger("epoch").info(f"Epoch {epoch} done")
+        logging.info(f"Training Subcortical Pathway finished at {datetime.now().strftime('%Y%m%d_%H%M%S')}")
     
-    # Then train pre_eval
+    # Then train pre_eval and controller in periods
+    if not pfc_controller_train:
+        return
     model_subcortical_pathway.eval()
     for period in range(PERIODS):
+        # Train pre_eval
         logging.getLogger("epoch").info(f"Period {period}/{PERIODS}")
         loss_pfc = torch.nn.MSELoss()
         optim_pre_eval = torch.optim.Adam(model_pfc.parameters(), lr=0.001)
@@ -331,12 +342,20 @@ def train_models_periods (
         logging.getLogger("epoch").info(f"Period {period} done at {datetime.now().strftime('%Y%m%d_%H%M%S')}")
     logging.info(f"Training PFC and controller finished at {datetime.now().strftime('%Y%m%d_%H%M%S')}")
 
+
+
 if __name__ == "__main__":
     # set data-path and annotation-path
     parser = argparse.ArgumentParser(description="Train a video model")
     parser.add_argument('--data_dir', type=str, required=True, help='Path to the dataset directory')
     parser.add_argument('--annotation_path', type=str, required=True, help='Path to the annotation file')
     parser.add_argument('--out_dir', type=str, required=False, help='Path to the output directory', default=None)
+    parser.add_argument('--subcortical_pathway', type=str, required=False, help='Path to the subcortical pathway model', default=None)
+    parser.add_argument('--hippocampus', type=str, required=False, help='Path to the hippocampus model', default=None)
+    parser.add_argument('--pfc', type=str, required=False, help='Path to the prefrontal cortex model', default=None)
+    parser.add_argument('--controller', type=str, required=False, help='Path to the controller model', default=None)
+    parser.add_argument('--subcortical_pathway_train', type=bool, required=False, help='Train the subcortical pathway', default=True)
+    parser.add_argument('--pfc_controller_train', type=bool, required=False, help='Train the PFC and controller', default=True)
 
     # 引数を解析
     args = parser.parse_args()
@@ -361,15 +380,27 @@ if __name__ == "__main__":
     train_loader = load_video_dataset(args.data_dir, args.annotation_path, BATCH_SIZE, CLIP_LENGTH)
     model_mvit = EnhancedMViT(pretrained=True).to(device=DEVICE)
     model_pfc = PFC(DIM_CHARACTERISTICS, SIZE_EPISODE, 8).to(device=DEVICE)
-    model_hippocampus = HippocampusRefactored(
-        DIM_CHARACTERISTICS,
-        SIZE_EPISODE,
-        replay_rate=10,
-        episode_per_replay=5,
-        min_event_for_episode=5,
-    )
+    if args.pfc is not None:
+        model_pfc.load_state_dict(torch.load(args.pfc, map_location=DEVICE))
+    
+    if args.hippocampus is not None:
+        model_hippocampus = HippocampusRefactored.load_from_file(args.hippocampus)
+    else:
+        model_hippocampus = HippocampusRefactored(
+            DIM_CHARACTERISTICS,
+            SIZE_EPISODE,
+            replay_rate=10,
+            episode_per_replay=5,
+            min_event_for_episode=5,
+        )
+    
     model_subcortical_pathway = SubcorticalPathway().to(device=DEVICE)
+    if args.subcortical_pathway is not None:
+        model_subcortical_pathway.load_state_dict(torch.load(args.subcortical_pathway, map_location=DEVICE))
+    
     model_controller = EvalController().to(device=DEVICE)
+    if args.controller is not None:
+        model_controller.load_state_dict(torch.load(args.controller, map_location=DEVICE))
     ## load_model(
     ##     model_pfc=model_pfc,
     ##     model_hippocampus=model_hippocampus,
@@ -396,7 +427,9 @@ if __name__ == "__main__":
         model_hippocampus,
         model_subcortical_pathway,
         model_controller,
-        write_path=args.out_dir
+        write_path=args.out_dir,
+        subcortical_pathway_train=args.subcortical_pathway_train,
+        pfc_controller_train=args.pfc_controller_train
     )
     
     # save_model(
