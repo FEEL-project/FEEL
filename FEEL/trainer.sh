@@ -17,3 +17,9 @@ mkdir -p $OUT_DIR
 
 # 変数を使用してコマンドを実行
 python3 train.py --data_dir $DATA_DIR --annotation_path $ANNOTATION_PATH --out_dir $OUT_DIR > $OUT_DIR/err.out
+
+# # 使用するモデルの重みファイルのパス
+# SUBCORTICAL_PATHWAY="/home/u01231/project_body/FEEL/outs/train_202411230421/subcortical_pathway_10.pt"
+
+# # 変数を使用してコマンドを実行
+# python3 train.py --data_dir $DATA_DIR --annotation_path $ANNOTATION_PATH --out_dir $OUT_DIR --subcortical_pathway $SUBCORTICAL_PATHWAY --subcortical_pathway_train False --pfc_controller_train True > $OUT_DIR/err.out
