@@ -35,7 +35,7 @@ class VectorDatabase():
     def add(self, id: int, vector: np.ndarray) -> None:
         """Add a vector with associated id."""
         if not isinstance(vector, np.ndarray):
-            vector = np.array(vector, dtype=np.float32)
+            vector = np.array(vector.cpu(), dtype=np.float32)
         
         if vector.shape != (self.dimension,):
             raise ValueError(f"Vector dimension must be {self.dimension}")
@@ -101,7 +101,7 @@ class VectorDatabase():
         Returns list of (id, distance) tuples.
         """
         if not isinstance(query_vector, np.ndarray):
-            query_vector = np.array(query_vector, dtype=np.float32)
+            query_vector = np.array(query_vector.cpu(), dtype=np.float32)
         
         if query_vector.shape != (self.dimension,):
             raise ValueError(f"Query vector dimension must be {self.dimension}")

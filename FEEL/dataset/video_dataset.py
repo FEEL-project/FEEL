@@ -6,6 +6,7 @@ import os
 from pathlib2 import Path
 import json
 import csv
+DEVICE = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
 class VideoDataset(Dataset):
     def __init__(self, inputs, labels, names,clip_length, frame_size=(224, 224)):
@@ -55,7 +56,7 @@ def csv_to_dict(file_path):
             key = row[0]
             values = row[1:]
             values = list(map(float, row[1:])) 
-            values = torch.tensor(values)
+            values = torch.tensor(values).to(DEVICE)
             result_dict[key] = values
     return result_dict
 
@@ -101,6 +102,7 @@ def load_video_dataset(video_dir: str, label_path: str, batch_size: int, clip_le
 
         input = torch.tensor(input, dtype=torch.float32) / 255.0  # 正規化
         input = input.unsqueeze(0)
+        input = input.to(DEVICE)
         with torch.no_grad():
             _,input,_ = mvit(input)
         input = input.squeeze(0)

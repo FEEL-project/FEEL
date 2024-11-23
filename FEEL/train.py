@@ -30,7 +30,7 @@ def eval2_to_eval1(eval2: torch.Tensor) -> torch.Tensor:
         raise ValueError(f"Invalid size of eval2: {eval2.size()}")
     ret = torch.tensor(((eval2[:, 0]+eval2[:, 1])/2 - (eval2[:, 2]+eval2[:, 4]+eval2[:, 5]+eval2[:, 6])/4) * (2+eval2[:, 3]+eval2[:, 7]) / 4)
     ret = ret.unsqueeze(1)
-    return ret
+    return ret.to(DEVICE)
 
 def zero_padding(data: torch.Tensor, size:tuple) -> torch.Tensor:
     """Zero padding to make data size to size
@@ -42,7 +42,7 @@ def zero_padding(data: torch.Tensor, size:tuple) -> torch.Tensor:
     """
     tensor = torch.zeros(size)
     tensor[:data.size(0), :, :] = data
-    return tensor
+    return tensor.to(DEVICE)
 
 def train_subcortical_pathway_epoch(
     data_loader: DataLoader,
