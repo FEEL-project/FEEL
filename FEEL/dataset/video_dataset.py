@@ -7,10 +7,11 @@ from pathlib2 import Path
 import json
 import csv
 from functools import wraps
+import logging
 
 DEVICE = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 USE_DATASET_CACHE = True # Whether to load from cache instead of processing video every time
-VIDEO_DATASET_PATH = "/home/u01230/SoccerNarration/FEEL/dataset/video_dataset.json" # Path to save/load dataset cache
+VIDEO_DATASET_PATH = "dataset/splitted_TrainVal.json" # Path to save/load dataset cache
 
 class VideoDataset(Dataset):
     def __init__(self, inputs, labels, names,clip_length, frame_size=(224, 224)):
@@ -83,13 +84,14 @@ def csv_to_dict(file_path):
             result_dict[key] = values
     return result_dict
 
-def load_video_dataset(video_dir: str, label_path: str, batch_size: int, clip_length: int, mvit)->DataLoader:
+def load_video_dataset(video_dir: str, label_path: str, batch_size: int, clip_length: int, mvit, use_cache: bool = True, cache_path: str = None)->DataLoader:
 # 動画データセットのディレクトリ
     data_set: VideoDataset = None
-    if USE_DATASET_CACHE and os.path.exists(VIDEO_DATASET_PATH):
-        print(f"Loading dataset from file {VIDEO_DATASET_PATH}")
-        data_set = VideoDataset.load_from_file(VIDEO_DATASET_PATH, clip_length)
+    if use_cache and cache_path is not None and os.path.exists(cache_path):
+        logging.info(f"Loading dataset from file {cache_path}")
+        data_set = VideoDataset.load_from_file(cache_path, clip_length)
     else:
+        logging.info(f"Processing video files in {video_dir}")
         video_dir_path = Path(video_dir)
         label_df = csv_to_dict(label_path)
         frame_size=(224, 224)
@@ -98,6 +100,7 @@ def load_video_dataset(video_dir: str, label_path: str, batch_size: int, clip_le
         labels = []
         names = []
         for video_file in video_dir_path.glob('*.mp4'):
+            logging.info(f"Processing {video_file.name}")
             path = os.path.join(video_dir, video_file.name)
             # OpenCVで動画ファイルを開く
             cap = cv2.VideoCapture(path)
@@ -134,14 +137,14 @@ def load_video_dataset(video_dir: str, label_path: str, batch_size: int, clip_le
             with torch.no_grad():
                 _,input,_ = mvit(input)
             input = input.squeeze(0)
-            print(input.shape)
             inputs.append(input)
             labels.append(label_df[video_file.name])
             names.append(video_file.name)
 
         # データセットとDataLoaderの作成
         data_set = VideoDataset(inputs, labels, names, clip_length=clip_length)
-        data_set.save_to_file(VIDEO_DATASET_PATH)
+        if cache_path is not None:
+            data_set.save_to_file(cache_path)
     return DataLoader(data_set, batch_size=batch_size, shuffle=True)
     
 

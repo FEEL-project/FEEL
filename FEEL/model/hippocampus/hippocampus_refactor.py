@@ -158,7 +158,7 @@ class HippocampusRefactored():
         Returns:
             Tuple[torch.Tensor, torch.Tensor, torch.Tensor, torch.Tensor, torch.Tensor]: Tuple containing id, data, eval1, eval2, priority
         """
-        if len(self) <= self.min_event_for_replay:
+        if len(self) < self.min_event_for_replay:
             return None
         if self.replay_generator is None or self.times_replayed % self.loss_freq == 0:
             # Refresh weight randomly
