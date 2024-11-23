@@ -75,6 +75,7 @@ def train_subcortical_pathway_epoch(
 def train_pre_eval_epoch(
     epoch: int,
     data_loader: DataLoader,
+    model_subcortical_pathway: SubcorticalPathway,
     model_pfc: PFC,
     model_hippocampus: HippocampusRefactored,
     loss_fn: torch.nn.Module,
@@ -117,6 +118,7 @@ def train_pre_eval_epoch(
 
 def train_controller_epoch(
     data_loader: DataLoader,
+    model_subcortical_pathway: SubcorticalPathway,
     model_pfc: PFC,
     model_hippocampus: HippocampusRefactored,
     model_controller: EvalController,
@@ -208,7 +210,7 @@ def train_models(
     for epoch in range(EPOCHS):
         optim_pre_eval.zero_grad()
         logging.getLogger("epoch").info(f"Epoch {epoch}/{EPOCHS}")
-        train_pre_eval_epoch(epoch, data_loader, model_pfc, model_hippocampus, loss_pfc, optim_pre_eval)
+        train_pre_eval_epoch(epoch, data_loader, model_subcortical_pathway, model_pfc, model_hippocampus, loss_pfc, optim_pre_eval)
         torch.save(model_pfc.state_dict(), os.path.join(write_path, f"pfc_{epoch}.pt"))
         model_hippocampus.save_to_file(os.path.join(write_path, f"hippocampus_{epoch}.json"))
         logging.getLogger("epoch").info(f"Epoch {epoch} done, hippocampus has {len(model_hippocampus)} memories")
@@ -231,6 +233,7 @@ def train_models(
         logging.getLogger("epoch").info(f"Epoch {epoch+1}/{EPOCHS}")
         train_controller_epoch(
             data_loader,
+            model_subcortical_pathway,
             model_pfc,
             model_hippocampus,
             model_controller,
@@ -296,7 +299,7 @@ def train_models_periods (
         for epoch in range(EPOCHS):
             optim_pre_eval.zero_grad()
             logging.getLogger("epoch").info(f"Epoch {epoch}/{EPOCHS}")
-            train_pre_eval_epoch(epoch, data_loader, model_pfc, model_hippocampus, loss_pfc, optim_pre_eval)
+            train_pre_eval_epoch(epoch, data_loader, model_subcortical_pathway, model_pfc, model_hippocampus, loss_pfc, optim_pre_eval)
             torch.save(model_pfc.state_dict(), os.path.join(write_path, f"pfc_{period}_{epoch}.pt"))
             model_hippocampus.save_to_file(os.path.join(write_path, f"hippocampus_{period}_{epoch}.json"))
             logging.getLogger("epoch").info(f"Epoch {epoch} of period {period} done, hippocampus has {len(model_hippocampus)} memories")
@@ -319,6 +322,7 @@ def train_models_periods (
             logging.getLogger("epoch").info(f"Epoch {epoch+1}/{EPOCHS}")
             train_controller_epoch(
                 data_loader,
+                model_subcortical_pathway,
                 model_pfc,
                 model_hippocampus,
                 model_controller,

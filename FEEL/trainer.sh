@@ -25,7 +25,8 @@ OUT_DIR="/home/u01231/project_body/FEEL/outs/train_$stamp"
 mkdir -p $OUT_DIR
 
 # 変数を使用してコマンドを実行
-python3 train.py --data_dir $DATA_DIR --annotation_path $ANNOTATION_PATH --out_dir $OUT_DIR > $OUT_DIR/err.out
+# python3 train.py --data_dir $DATA_DIR --annotation_path $ANNOTATION_PATH --out_dir $OUT_DIR > $OUT_DIR/err.out
+python3 train_merged.py --data_dir $DATA_DIR --annotation_path $ANNOTATION_PATH --out_dir $OUT_DIR > $OUT_DIR/err.out
 
 # 使用したデータのパスなどをerr.outに書き込む
 echo "DATA_DIR: $DATA_DIR" > $OUT_DIR/err.out
