@@ -5,3 +5,4 @@ data/kinetics-dataset
 weights/
 *.out
 data/*.zip
+trainer.sh
