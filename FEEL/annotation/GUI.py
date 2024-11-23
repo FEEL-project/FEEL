@@ -103,4 +103,4 @@ with gr.Blocks(css=".slider { margin: 5px 0 !important; }") as demo:
     )
 
 # GUIを起動
-demo.launch()
+demo.launch(allowed_paths=["/home/u01230/SoccerNarration/FEEL/data/EmVidCap/Videos/EmVidCap-L/TrainVal_clips/splitted_TrainVal"])
