@@ -81,7 +81,7 @@ class PFC(nn.Module):
             torch.Tensor: Output tensor [dim_out]
         """
         if not (src.size(0) == self.size_episode and src.size(2) == self.dim_event):
-            raise ValueError(f"Input shape must be (size_episode, batch_size, dim_event) = [{self.size_episode}, *, {self.dim_event}], got {src.shape}")
+            raise ValueError(f"Input shape must be (size_episode, batch_size, dim_event) = ({self.size_episode}, *, {self.dim_event}), got {src.shape}")
         src = self.conv(src)
         src = self.positional_encoding(src)
         # Pass through the Transformer Encoder
