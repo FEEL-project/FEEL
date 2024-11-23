@@ -10,6 +10,8 @@ from utils import timeit
 from model import EnhancedMViT, PFC, Hippocampus, HippocampusRefactored, SubcorticalPathway, EvalController
 # from save_and_load import load_model, save_model
 
+BATCH_SIZE = 20
+EPOCHS = 50
 CLIP_LENGTH = 16
 DIM_CHARACTERISTICS = 768
 # DEVICE = torch.device("cpu") #torch.device("cuda" if torch.cuda.is_available() else "cpu")
@@ -219,8 +221,80 @@ def train_pfc_controller_epoch(
                 model_hippocampus.save_to_memory(event=event, eval1=eval1[cnt], eval2=labels_eval2[cnt]) 
                 cnt += 1
     logging.info(f"Average loss for epoch (eval2 to eval2_label): {sum(losses_2_to_label)/len(losses_2_to_label)}")
+    logging.info(f"Average loss for epoch (eval2 to pre_eval): {sum(losses_2_to_pre)/len(losses_2_to_pre)}")     
+
+def train_pfc_controller_epoch_with_replay(
+    epoch: int,
+    data_loader: DataLoader,
+    model_subcortical_pathway: SubcorticalPathway,
+    model_pfc: PFC,
+    model_hippocampus: HippocampusRefactored,
+    model_controller: EvalController,
+    loss_maximization: torch.nn.Module,
+    optim_pfc: torch.optim.Optimizer,
+    loss_expectation: torch.nn.Module,
+    optim_controller: torch.optim.Optimizer
+) -> None:
+    """Train PFC and controller for one epoch
+
+    Args:
+        data_loader (DataLoader): DataLoader for training
+        model_mvit (EnhancedMViT): MViT model
+        model_pfc (PFC): PFC model
+        model_hippocampus (HippocampusRefactored): Hippocampus model
+        model_controller (EvalController): Controller model
+        loss_eval2 (torch.nn.Module): Loss function for controller
+        optim_pfc (torch.optim.Optimizer): Optimizer for PFC
+        loss_pfc (torch.nn.Module): Loss function for PFC
+        optim_controller (torch.optim.Optimizer): Optimizer for controller
+
+    Returns:
+        None
+    """
+    losses_2_to_label = []
+    losses_2_to_pre = []
+    for i, data in enumerate(data_loader):
+        characteristics, labels_eval2,_ = data
+        eval1 = model_subcortical_pathway(characteristics)
+        events = model_hippocampus.receive(characteristics, eval1)
+        if len(model_hippocampus) < model_hippocampus.min_event_for_episode:
+            episode = zero_padding(characteristics, (SIZE_EPISODE, eval1.shape[0], DIM_CHARACTERISTICS))
+            pre_eval = model_pfc(episode)
+        else:
+            episode = model_hippocampus.generate_episodes_batch(events=events)
+            pre_eval = model_pfc(episode.transpose(0, 1))
+        out_eval2 = model_controller(eval1, pre_eval)
+        loss_2_to_label = loss_maximization(out_eval2, labels_eval2)
+        loss_2_to_pre = loss_expectation(pre_eval, out_eval2)
+        loss_2_to_label.backward(retain_graph=True)
+        loss_2_to_pre.backward()
+        optim_pfc.step()
+        optim_controller.step()
+        losses_2_to_label.append(loss_2_to_label)
+        losses_2_to_pre.append(loss_2_to_pre)
+        if i % BATCH_LOG_FREQ == 0:
+            logging.getLogger("batch").debug(f"Iteration {i}: loss (eval2 to eval2_label) {loss_2_to_label}, loss (eval2 to pre_eval) {loss_2_to_pre}")
+        if epoch==0:
+            cnt = 0
+            for event in events:
+                model_hippocampus.save_to_memory(event=event, eval1=eval1[cnt], eval2=labels_eval2[cnt])
+                cnt += 1
+        if epoch % model_hippocampus.replay_rate == 0 and epoch > 0:
+            optim_pfc.zero_grad()
+            optim_controller.zero_grad()
+            events = model_hippocampus.replay()
+            episode = model_hippocampus.generate_episodes_batch(events=events)
+            pre_eval = model_pfc(episode.transpose(0, 1))
+            out_eval2 = model_controller(eval1, pre_eval)
+            loss_2_to_label = loss_maximization(out_eval2, labels_eval2)
+            loss_2_to_pre = loss_expectation(pre_eval, out_eval2)
+            loss_2_to_label.backward(retain_graph=True)
+            loss_2_to_pre.backward()
+            optim_pfc.step()
+            optim_controller.step()
+            logging.getLogger("batch").debug(f"Replay at epoch {epoch}: loss (eval2 to eval2_label) {loss_2_to_label}, loss (eval2 to pre_eval) {loss_2_to_pre}")
+    logging.info(f"Average loss for epoch (eval2 to eval2_label): {sum(losses_2_to_label)/len(losses_2_to_label)}")
     logging.info(f"Average loss for epoch (eval2 to pre_eval): {sum(losses_2_to_pre)/len(losses_2_to_pre)}")
-        
 
 def train_models(
     data_loader: DataLoader,
@@ -231,6 +305,7 @@ def train_models(
     write_path: str = None,
     subcortical_pathway_train: bool = True,
     pfc_controller_train: bool = True,
+    replay: bool = False
 ):
     """Trains the model
     - Do not train MViT (use preloaded model)
@@ -275,24 +350,39 @@ def train_models(
         optim_pre_eval.zero_grad()
         optim_controller.zero_grad()
         logging.getLogger("epoch").info(f"Epoch {epoch}/{EPOCHS}")
-        train_pfc_controller_epoch(
-            epoch,
-            data_loader,
-            model_subcortical_pathway,
-            model_pfc,
-            model_hippocampus,
-            model_controller,
-            loss_pfc,
-            optim_pre_eval,
-            loss_controller,
-            optim_controller
-        )
+        if replay:
+            train_pfc_controller_epoch_with_replay(
+                epoch,
+                data_loader,
+                model_subcortical_pathway,
+                model_pfc,
+                model_hippocampus,
+                model_controller,
+                loss_pfc,
+                optim_pre_eval,
+                loss_controller,
+                optim_controller
+            )
+        else:
+            train_pfc_controller_epoch(
+                epoch,
+                data_loader,
+                model_subcortical_pathway,
+                model_pfc,
+                model_hippocampus,
+                model_controller,
+                loss_pfc,
+                optim_pre_eval,
+                loss_controller,
+                optim_controller
+            )
         torch.save(model_pfc.state_dict(), os.path.join(write_path, f"pfc_{epoch}.pt"))
         torch.save(model_controller.state_dict(), os.path.join(write_path, f"controller_{epoch}.pt"))
         model_hippocampus.save_to_file(os.path.join(write_path, f"hippocampus_{epoch}.json"))
         logging.getLogger("epoch").info(f"Epoch {epoch} done, hippocampus has {len(model_hippocampus)} memories")
     logging.info(f"Training PFC and Controller finished at {datetime.now().strftime('%Y%m%d_%H%M%S')}")
 
+    
 if __name__ == "__main__":
     # set data-path and annotation-path
     parser = argparse.ArgumentParser(description="Train a video model")
@@ -305,6 +395,7 @@ if __name__ == "__main__":
     parser.add_argument('--controller', type=str, required=False, help='Path to the controller model', default=None)
     parser.add_argument('--subcortical_pathway_train', type=bool, required=False, help='Train the subcortical pathway', default=True)
     parser.add_argument('--pfc_controller_train', type=bool, required=False, help='Train the PFC and controller', default=True)
+    parser.add_argument('--replay', type=bool, required=False, help='Use replay in hippocampus', default=False)
     parser.add_argument('--no-debug', action='store_false', help='Enable debug logging')
     parser.add_argument('--no-video-cache', action='store_false', help='Disable video cache')
     parser.add_argument('--log-frequency', type=int, required=False, help='Log frequency', default=10)
@@ -358,9 +449,10 @@ if __name__ == "__main__":
         model_hippocampus = HippocampusRefactored(
             DIM_CHARACTERISTICS,
             SIZE_EPISODE,
-            replay_rate=10,
+            replay_rate=EPOCHS//5,
             episode_per_replay=5,
             min_event_for_episode=5,
+            min_event_for_replay=20
         )
     
     model_subcortical_pathway = SubcorticalPathway().to(device=DEVICE)
@@ -379,5 +471,6 @@ if __name__ == "__main__":
         model_controller,
         write_path=args.out_dir,
         subcortical_pathway_train=args.subcortical_pathway_train,
-        pfc_controller_train=args.pfc_controller_train
+        pfc_controller_train=args.pfc_controller_train,
+        replay=args.replay
     )
