@@ -1,5 +1,6 @@
 import torch
 from torch.utils.data import DataLoader
+from torch import nn
 import logging
 import os
 import argparse
@@ -7,17 +8,19 @@ from datetime import datetime
 
 from dataset.video_dataset import load_video_dataset
 from utils import timeit
-from model import EnhancedMViT, PFC, Hippocampus, HippocampusRefactored, SubcorticalPathway, EvalController
+from model import EnhancedMViT, PFC_nn, Hippocampus, HippocampusRefactored, SubcorticalPathway, EvalController, char2eval
 # from save_and_load import load_model, save_model
 
 BATCH_SIZE = 20
 CLIP_LENGTH = 16
 DIM_CHARACTERISTICS = 768
-SIZE_EPISODE = 5
-# DEVICE = torch.device("cpu") #torch.device("cuda" if torch.cuda.is_available() else "cpu")
+SIZE_EPISODE = 3
+# DEVICE = torch.device("cpu")
 DEVICE = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 BATCH_LOG_FREQ = 10
 DEBUG = True
+
+
 
 def eval2_to_eval1(eval2: torch.Tensor) -> torch.Tensor:
     """Convert eval2 to eval1
@@ -28,11 +31,10 @@ def eval2_to_eval1(eval2: torch.Tensor) -> torch.Tensor:
     """
     if eval2.size(1) != 8:
         raise ValueError(f"Invalid size of eval2: {eval2.size()}")
-    if not isinstance(eval2, torch.Tensor):
-        raise ValueError(f"eval2 is not a tensor: {eval2}")
     ret = ((eval2[:, 0]+eval2[:, 1])/2 - (eval2[:, 2]+eval2[:, 4]+eval2[:, 5]+eval2[:, 6])/4) * (2+eval2[:, 3]+eval2[:, 7]) / 4
     ret = ret.unsqueeze(1)
     return ret.to(DEVICE)
+
 
 def zero_padding(data: torch.Tensor, size:tuple) -> torch.Tensor:
     """Zero padding to make data size to size
@@ -45,6 +47,35 @@ def zero_padding(data: torch.Tensor, size:tuple) -> torch.Tensor:
     tensor = torch.zeros(size)
     tensor[:data.size(0), :, :] = data
     return tensor.to(DEVICE)
+
+
+def train_char2eval(
+    data_loader: DataLoader,
+    model: char2eval,
+    loss_fn: torch.nn.Module,
+    optim: torch.optim.Optimizer
+):
+    """Train subcortical pathway for one epoch
+
+    Args:
+        data_loader (DataLoader): DataLoader for training
+        model_mvit (EnhancedMViT): MViT model
+        model (SubcorticalPathway): Subcortical pathway model
+        loss_fn (torch.nn.Module): Loss function
+        optim (torch.optim.Optimizer): Optimizer
+    """
+    losses = []
+    for i, data in enumerate(data_loader):
+        characteristics, label_eval2,_ = data
+        eval_2 = model(characteristics) 
+        loss = loss_fn(eval_2, label_eval2)
+        loss.backward()
+        optim.step()
+        losses.append(loss)
+        if i % BATCH_LOG_FREQ == 0:
+            logging.getLogger("batch").debug(f"Iteration {i}: loss {loss}")
+    logging.info(f"Average loss for epoch: {sum(losses)/len(losses)}")
+
 
 def train_subcortical_pathway_epoch(
     data_loader: DataLoader,
@@ -74,98 +105,11 @@ def train_subcortical_pathway_epoch(
             logging.getLogger("batch").debug(f"Iteration {i}: loss {loss}")
     logging.info(f"Average loss for epoch: {sum(losses)/len(losses)}")
 
-def train_pre_eval_epoch(
-    epoch: int,
-    data_loader: DataLoader,
-    model_subcortical_pathway: SubcorticalPathway,
-    model_pfc: PFC,
-    model_hippocampus: HippocampusRefactored,
-    loss_fn: torch.nn.Module,
-    optim: torch.optim.Optimizer
-):
-    """Train pre_eval for one epoch
-
-    Args:
-        data_loader (DataLoader): DataLoader for training
-        model_mvit (EnhancedMViT): MViT model
-        model_pfc (PFC): PFC model
-        model_hippocampus (HippocampusRefactored): Hippocampus model
-        model_controller (EvalController): Controller model
-        loss_fn (torch.nn.Module): Loss function for PFC
-        optim (torch.optim.Optimizer): Optimizer
-    """
-    losses = []
-    for i, data in enumerate(data_loader):
-        characteristics, labels_eval2,_ = data
-        eval1 = model_subcortical_pathway(characteristics)
-        events = model_hippocampus.receive(characteristics, eval1)
-        if len(model_hippocampus) < model_hippocampus.min_event_for_episode:
-            episode = zero_padding(characteristics, (SIZE_EPISODE, BATCH_SIZE, DIM_CHARACTERISTICS))
-            pre_eval = model_pfc(episode)
-        else:
-            episode = model_hippocampus.generate_episodes_batch(events=events)
-            pre_eval = model_pfc(episode.transpose(0, 1))
-        loss = loss_fn(pre_eval, labels_eval2)
-        loss.backward()
-        optim.step()
-        losses.append(loss)
-        if i % BATCH_LOG_FREQ == 0:
-            logging.getLogger("batch").debug(f"Iteration {i}: loss {loss}")
-        if epoch==0:
-            cnt = 0
-            for event in events:
-                model_hippocampus.save_to_memory(event=event, eval1=eval1[cnt], eval2=labels_eval2[cnt]) 
-                cnt += 1
-    logging.info(f"Average loss for epoch: {sum(losses)/len(losses)}")
-
-def train_controller_epoch(
-    data_loader: DataLoader,
-    model_subcortical_pathway: SubcorticalPathway,
-    model_pfc: PFC,
-    model_hippocampus: HippocampusRefactored,
-    model_controller: EvalController,
-    loss_fn: torch.nn.Module,
-    optim: torch.optim.Optimizer
-) -> None:
-    """Train controller for one epoch
-
-    Args:
-        data_loader (DataLoader): DataLoader for training
-        model_mvit (EnhancedMViT): MViT model
-        model_pfc (PFC): PFC model
-        model_hippocampus (HippocampusRefactored): Hippocampus model
-        model_controller (EvalController): Controller model
-        loss_fn (torch.nn.Module): Loss function for controller
-        optim (torch.optim.Optimizer): Optimizer
-
-    Returns:
-        None
-    """
-    losses = []
-    for i, data in enumerate(data_loader):
-        characteristics, labels_eval2,_ = data
-        eval1 = model_subcortical_pathway(characteristics)
-        events = model_hippocampus.receive(characteristics, eval1)
-        if len(model_hippocampus) < model_hippocampus.min_event_for_episode:
-            episode = zero_padding(characteristics, (SIZE_EPISODE, eval1.shape[0], DIM_CHARACTERISTICS))
-            pre_eval = model_pfc(episode)
-        else:
-            episode = model_hippocampus.generate_episodes_batch(events=events)
-            pre_eval = model_pfc(episode.transpose(0, 1))
-        out_eval2 = model_controller(eval1, pre_eval)
-        loss = loss_fn(out_eval2, labels_eval2)
-        loss.backward()
-        optim.step()
-        losses.append(loss)
-        if i % BATCH_LOG_FREQ == 0:
-            logging.getLogger("batch").debug(f"Iteration {i}: loss {loss}")
-    logging.info(f"Average loss for epoch: {sum(losses)/len(losses)}")
-
 def train_pfc_controller_epoch(
     epoch: int,
     data_loader: DataLoader,
     model_subcortical_pathway: SubcorticalPathway,
-    model_pfc: PFC,
+    model_pfc: PFC_nn,
     model_hippocampus: HippocampusRefactored,
     model_controller: EvalController,
     loss_maximization: torch.nn.Module,
@@ -197,10 +141,12 @@ def train_pfc_controller_epoch(
         events = model_hippocampus.receive(characteristics, eval1)
         if len(model_hippocampus) < model_hippocampus.min_event_for_episode:
             episode = zero_padding(characteristics, (SIZE_EPISODE, eval1.shape[0], DIM_CHARACTERISTICS))
-            pre_eval = model_pfc(episode)
+            print(episode.transpose(0,1).shape)
+            pre_eval = model_pfc(episode.transpose(0, 1))
         else:
             episode = model_hippocampus.generate_episodes_batch(events=events)
-            pre_eval = model_pfc(episode.transpose(0, 1))
+            print(episode.transpose(0, 1).shape)
+            pre_eval = model_pfc(episode)
         out_eval2 = model_controller(eval1, pre_eval)
         loss_2_to_label = loss_maximization(out_eval2, labels_eval2)
         loss_2_to_pre = loss_expectation(pre_eval, out_eval2)
@@ -219,11 +165,11 @@ def train_pfc_controller_epoch(
                 cnt += 1
     logging.info(f"Average loss for epoch (eval2 to eval2_label): {sum(losses_2_to_label)/len(losses_2_to_label)}")
     logging.info(f"Average loss for epoch (eval2 to pre_eval): {sum(losses_2_to_pre)/len(losses_2_to_pre)}")
-        
+ 
 
 def train_models(
     data_loader: DataLoader,
-    model_pfc: PFC,
+    model_pfc: PFC_nn,
     model_hippocampus: HippocampusRefactored,
     model_subcortical_pathway: SubcorticalPathway,
     model_controller: EvalController,
@@ -330,7 +276,7 @@ if __name__ == "__main__":
     model_mvit = EnhancedMViT(pretrained=True).to(device=DEVICE)
     # train_loader = load_video_dataset("data/small_data/trainval", "annotation/params_trainval.csv", BATCH_SIZE, CLIP_LENGTH)
     train_loader = load_video_dataset(args.data_dir, args.annotation_path, BATCH_SIZE, CLIP_LENGTH, model_mvit)
-    model_pfc = PFC(DIM_CHARACTERISTICS, SIZE_EPISODE, 8).to(device=DEVICE)
+    model_pfc = PFC_nn(size_episode=SIZE_EPISODE).to(device=DEVICE)
     if args.pfc is not None:
         model_pfc.load_state_dict(torch.load(args.pfc, map_location=DEVICE))
     
@@ -362,16 +308,25 @@ if __name__ == "__main__":
     ## model_hippocampus = HippocampusRefactored.load_from_file(f"./weights/hippocampus_{0}.pkl")
     
     train_models(
-        data_loader=train_loader,
-        model_pfc=model_pfc,
-        model_hippocampus=model_hippocampus,
-        model_subcortical_pathway=model_subcortical_pathway,
-        model_controller=model_controller,
+        train_loader,
+        model_pfc,
+        model_hippocampus,
+        model_subcortical_pathway,
+        model_controller,
         write_path=args.out_dir,
         subcortical_pathway_train=args.subcortical_pathway_train,
-        pfc_controller_train=args.pfc_controller_train
     )
     
+    # train_models_periods(
+    #     train_loader,
+    #     model_pfc,
+    #     model_hippocampus,
+    #     model_subcortical_pathway,
+    #     model_controller,
+    #     write_path=args.out_dir,
+    #     subcortical_pathway_train=args.subcortical_pathway_train,
+    #     pfc_controller_train=args.pfc_controller_train
+    # )
     
     # save_model(
     #     model_pfc=model_pfc,

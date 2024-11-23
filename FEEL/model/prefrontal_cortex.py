@@ -113,8 +113,6 @@ class PFC_nn(nn.Module):
         self.dropout = nn.Dropout(0.2)
     
     def forward(self, src: torch.Tensor) -> torch.Tensor:
-        if not (src.size(0) == self.size_episode and src.size(2) == self.dim_event):
-            raise ValueError(f"Input shape must be (size_episode, batch_size, dim_event) = [{self.size_episode}, *, {self.dim_event}], got {src.shape}")
         src = self.flatten(src)
         x = self.fc1(src)
         x = self.relu(x)
