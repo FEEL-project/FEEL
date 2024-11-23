@@ -276,10 +276,10 @@ def train_models_periods (
     optim_eval1 = torch.optim.Adam(model_subcortical_pathway.parameters(), lr=0.001)
     for epoch in range(EPOCHS):
         optim_eval1.zero_grad()
-        logging.getLogger("epoch").info(f"Epoch {epoch}/{EPOCHS}")
+        logging.getLogger("epoch").info(f"subcortial: Epoch {epoch}/{EPOCHS}")
         train_subcortical_pathway_epoch(data_loader, model_subcortical_pathway, loss_eval1, optim_eval1)
         torch.save(model_subcortical_pathway.state_dict(), os.path.join(write_path, f"subcortical_pathway_{epoch}.pt"))
-        logging.getLogger("epoch").info(f"Epoch {epoch} done")
+        logging.getLogger("epoch").info(f"subcortial: Epoch {epoch} done")
     logging.info(f"Training Subcortical Pathway finished at {datetime.now().strftime('%Y%m%d_%H%M%S')}")
     
     # Then train pre_eval and controller in periods
@@ -293,12 +293,12 @@ def train_models_periods (
         optim_pre_eval = torch.optim.Adam(model_pfc.parameters(), lr=0.001)
         for epoch in range(EPOCHS):
             optim_pre_eval.zero_grad()
-            logging.getLogger("epoch").info(f"Epoch {epoch}/{EPOCHS}")
+            logging.getLogger("epoch").info(f"pfc: Epoch {epoch}/{EPOCHS}")
             train_pre_eval_epoch(epoch, data_loader, model_pfc, model_hippocampus, loss_pfc, optim_pre_eval)
             torch.save(model_pfc.state_dict(), os.path.join(write_path, f"pfc_{period}_{epoch}.pt"))
             model_hippocampus.save_to_file(os.path.join(write_path, f"hippocampus_{period}_{epoch}.json"))
-            logging.getLogger("epoch").info(f"Epoch {epoch} of period {period} done, hippocampus has {len(model_hippocampus)} memories")
-        logging.getLogger("epoch").info(f"Period {period} done at {datetime.now().strftime('%Y%m%d_%H%M%S')}")
+            logging.getLogger("epoch").info(f"pfc: Epoch {epoch} of period {period} done, hippocampus has {len(model_hippocampus)} memories")
+        logging.getLogger("epoch").info(f"pfc: Period {period} done at {datetime.now().strftime('%Y%m%d_%H%M%S')}")
         
         model_hippocampus = HippocampusRefactored(
             DIM_CHARACTERISTICS,
@@ -313,7 +313,7 @@ def train_models_periods (
         optim_controller = torch.optim.Adam(model_controller.parameters(), lr=0.001)
         for epoch in range(EPOCHS):
             optim_controller.zero_grad()
-            logging.getLogger("epoch").info(f"Epoch {epoch+1}/{EPOCHS}")
+            logging.getLogger("epoch").info(f"controller: Epoch {epoch+1}/{EPOCHS}")
             train_controller_epoch(
                 data_loader,
                 model_pfc,
@@ -323,7 +323,7 @@ def train_models_periods (
                 optim_controller
             )
             torch.save(model_controller.state_dict(), os.path.join(write_path, f"controller_{period}_{epoch}.pt"))
-            logging.getLogger("epoch").info(f"Controller Epoch {epoch} of Period {period} done, hippocampus has {len(model_hippocampus)} memories")
+            logging.getLogger("epoch").info(f"Controller: Epoch {epoch} of Period {period} done, hippocampus has {len(model_hippocampus)} memories")
         logging.getLogger("epoch").info(f"Period {period} done at {datetime.now().strftime('%Y%m%d_%H%M%S')}")
     logging.info(f"Training PFC and controller finished at {datetime.now().strftime('%Y%m%d_%H%M%S')}")
 
