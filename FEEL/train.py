@@ -28,7 +28,11 @@ def eval2_to_eval1(eval2: torch.Tensor) -> torch.Tensor:
     """
     if eval2.size(1) != 8:
         raise ValueError(f"Invalid size of eval2: {eval2.size()}")
-    return torch.tensor(((eval2[:, 0]+eval2[:, 1])/2 - (eval2[:, 2]+eval2[:, 4]+eval2[:, 5]+eval2[:, 6])/4) * (2+eval2[:, 3]+eval2[:, 7]) / 4)
+    eval2 = eval2.squeeze()
+    plus = eval2[0] + eval2[1]
+    minus = eval2[2] + eval2[4] + eval2[5] + eval2[6]
+    print(torch.tensor([[(plus/2 - minus/4)*(1+max(eval2[3], eval2[7]))/2]]))
+    return torch.tensor([[(plus/2 - minus/4)*(1+max(eval2[3], eval2[7]))/2]])
 
 def zero_padding(data: torch.Tensor, size:tuple) -> torch.Tensor:
     """Zero padding to make data size to size
