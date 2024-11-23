@@ -7,6 +7,9 @@ export LD_LIBRARY_PATH=/usr/local/cuda/lib64:$LD_LIBRARY_PATH
 stamp=$(date +"%Y%m%d%H%M")
 
 # コマンドライン引数を変数として定義
+# DATA_DIR="/home/u01230/SoccerNarration/FEEL/data/EmVidCap/Videos/EmVidCap-L/TrainVal_clips/splitted_Test"
+# ANNOTATION_PATH="/home/u01230/SoccerNarration/FEEL/annotation/params_test.csv"
+# OUT_DIR="/home/u01230/SoccerNarration/FEEL/outs/test_$stamp"
 DATA_DIR="/home/u01231/project_body/FEEL/data/youtube_movies/joe/splitted/trainval"
 ANNOTATION_PATH="/home/u01231/project_body/FEEL/annotation/joe/params_trainval.csv"
 OUT_DIR="/home/u01231/project_body/FEEL/outs/train_$stamp"
