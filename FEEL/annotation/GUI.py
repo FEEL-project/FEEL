@@ -5,14 +5,16 @@ import os
 
 # 保存先のデータベース（CSVファイル）の初期化
 # EmVidCapの場合
-# DATABASE_FILE = "../params_trainval.csv"
-# VIDEO_DIR = "../data/EmVidCap/Videos/EmVidCap-L/TrainVal_clips/splitted_TrainVal"
+DATABASE_FILE = "./params_trainval.csv"
+VIDEO_DIR = "/home/u01230/SoccerNarration/FEEL/data/EmVidCap/Videos/EmVidCap-L/TrainVal_clips/splitted_TrainVal"
+# DATABASE_FILE = "./params_test.csv"
+# VIDEO_DIR = "/home/u01230/SoccerNarration/FEEL/data/EmVidCap/Videos/EmVidCap-L/TrainVal_clips/splitted_Test"
 
 # joeの場合
 # DATABASE_FILE = "/home/u01231/project_body/FEEL/annotation/joe/params_trainval.csv"
 # VIDEO_DIR = "/home/u01231/project_body/FEEL/data/youtube_movies/joe/splitted/trainval"
-DATABASE_FILE = "/home/u01231/project_body/FEEL/annotation/joe/params_test.csv"
-VIDEO_DIR = "/home/u01231/project_body/FEEL/data/youtube_movies/joe/splitted/test"
+# DATABASE_FILE = "/home/u01231/project_body/FEEL/annotation/joe/params_test.csv"
+# VIDEO_DIR = "/home/u01231/project_body/FEEL/data/youtube_movies/joe/splitted/test"
 
 if not Path(DATABASE_FILE).exists():
     pd.DataFrame(columns=["video", "joy", "trust", "fear", "surprise", "sadness", "disgust", "anger", "anticipation"]).to_csv(
