@@ -31,7 +31,7 @@ def eval2_to_eval1(eval2: torch.Tensor) -> torch.Tensor:
     ret = torch.tensor(((eval2[:, 0]+eval2[:, 1])/2 - (eval2[:, 2]+eval2[:, 4]+eval2[:, 5]+eval2[:, 6])/4) * (2+eval2[:, 3]+eval2[:, 7]) / 4)
     ret = ret.unsqueeze(1)
     return ret
-
+  
 def zero_padding(data: torch.Tensor, size:tuple) -> torch.Tensor:
     """Zero padding to make data size to size
     Args:
@@ -178,6 +178,7 @@ def train_models(
         write_path = f"outs/train_{timestamp}"
     os.makedirs(write_path)
     logging.info(f"Training started at {timestamp}, writing to {write_path}")
+    logging.info(f"Device is {DEVICE}")
     model_pfc.train()
     model_subcortical_pathway.train()
     model_controller.train()
@@ -256,6 +257,7 @@ def train_models_periods (
         write_path = f"outs/train_{timestamp}"
     os.makedirs(write_path, exist_ok=True)
     logging.info(f"Training started at {timestamp}, writing to {write_path}")
+    logging.info(f"Device is {DEVICE}")
     model_pfc.train()
     model_subcortical_pathway.train()
     model_controller.train()
