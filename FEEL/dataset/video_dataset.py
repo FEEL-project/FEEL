@@ -6,7 +6,11 @@ import os
 from pathlib2 import Path
 import json
 import csv
+from functools import wraps
+
 DEVICE = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+USE_DATASET_CACHE = True # Whether to load from cache instead of processing video every time
+VIDEO_DATASET_PATH = "/home/u01230/SoccerNarration/FEEL/dataset/video_dataset.json" # Path to save/load dataset cache
 
 class VideoDataset(Dataset):
     def __init__(self, inputs, labels, names,clip_length, frame_size=(224, 224)):
@@ -46,6 +50,25 @@ class VideoDataset(Dataset):
         with open(file_path, "w") as f:
             json.dump(data, f, indent=4)
 
+    @classmethod
+    def load_from_file(cls, file_path: str, clip_length: int) -> "VideoDataset":
+        """Load VideoDataset from file
+
+        Args:
+            file_path (str): File path to load
+            clip_length (int): Clip lenth
+
+        Returns:
+            VideoDataset: VideoDataset instance
+        """
+        with open(file_path, "r") as f:
+            data = json.load(f)
+        inputs = [torch.Tensor(input).to(DEVICE) for input in data.get("inputs")]
+        labels = [torch.Tensor(label).to(DEVICE) for label in data.get("labels")]
+        names = data.get("names")
+        self = cls(inputs=inputs, labels=labels, names=names, clip_length=clip_length)
+        return self
+        
 def csv_to_dict(file_path):
     result_dict = {}
     with open(file_path, mode='r', newline='', encoding='utf-8') as f:
@@ -62,59 +85,64 @@ def csv_to_dict(file_path):
 
 def load_video_dataset(video_dir: str, label_path: str, batch_size: int, clip_length: int, mvit)->DataLoader:
 # 動画データセットのディレクトリ
-    video_dir_path = Path(video_dir)
-    label_df = csv_to_dict(label_path)
-    frame_size=(224, 224)
-    # 動画ファイルパスとラベルの準備
-    inputs = []
-    labels = []
-    names = []
-    for video_file in video_dir_path.glob('*.mp4'):
-        path = os.path.join(video_dir, video_file.name)
-        # OpenCVで動画ファイルを開く
-        cap = cv2.VideoCapture(path)
-        # 動画の全フレーム数を取得
-        frame_count = int(cap.get(cv2.CAP_PROP_FRAME_COUNT))
-        # 動画の全フレーム数からclip_lengthの数だけ均等なインデックスを取得
-        indices = np.linspace(1, frame_count, num=clip_length, dtype=int)
+    data_set: VideoDataset = None
+    if USE_DATASET_CACHE and os.path.exists(VIDEO_DATASET_PATH):
+        print(f"Loading dataset from file {VIDEO_DATASET_PATH}")
+        data_set = VideoDataset.load_from_file(VIDEO_DATASET_PATH, clip_length)
+    else:
+        video_dir_path = Path(video_dir)
+        label_df = csv_to_dict(label_path)
+        frame_size=(224, 224)
+        # 動画ファイルパスとラベルの準備
+        inputs = []
+        labels = []
+        names = []
+        for video_file in video_dir_path.glob('*.mp4'):
+            path = os.path.join(video_dir, video_file.name)
+            # OpenCVで動画ファイルを開く
+            cap = cv2.VideoCapture(path)
+            # 動画の全フレーム数を取得
+            frame_count = int(cap.get(cv2.CAP_PROP_FRAME_COUNT))
+            # 動画の全フレーム数からclip_lengthの数だけ均等なインデックスを取得
+            indices = np.linspace(1, frame_count, num=clip_length, dtype=int)
 
-        input = []
-        count = 1
-        while True:
-            # フレームを順番に取得
-            ret, frame = cap.read()
-            # 正しく取得できればretにTrueが返される
-            if ret:
-                # 均等に取得したindicesリスト内のインデックスのときだけフレームを保存
-                if count in indices:
-                    # フレームをリサイズ
-                    frame = cv2.resize(frame, frame_size)
-                    input.append(frame)
-            else:
-                break
-            count += 1
+            input = []
+            count = 1
+            while True:
+                # フレームを順番に取得
+                ret, frame = cap.read()
+                # 正しく取得できればretにTrueが返される
+                if ret:
+                    # 均等に取得したindicesリスト内のインデックスのときだけフレームを保存
+                    if count in indices:
+                        # フレームをリサイズ
+                        frame = cv2.resize(frame, frame_size)
+                        input.append(frame)
+                else:
+                    break
+                count += 1
 
-        cap.release()
+            cap.release()
 
-        # 取得したフレームのリストをテンソルに変換し、[T, C, H, W] に整形
-        input = np.array(input)  # [T, H, W, C]
-        input = np.transpose(input, (3, 0, 1, 2))  # [C, T, H, W]
+            # 取得したフレームのリストをテンソルに変換し、[T, C, H, W] に整形
+            input = np.array(input)  # [T, H, W, C]
+            input = np.transpose(input, (3, 0, 1, 2))  # [C, T, H, W]
 
-        input = torch.tensor(input, dtype=torch.float32) / 255.0  # 正規化
-        input = input.unsqueeze(0)
-        input = input.to(DEVICE)
-        with torch.no_grad():
-            _,input,_ = mvit(input)
-        input = input.squeeze(0)
-        print(input.shape)
-        inputs.append(input)
-        labels.append(label_df[video_file.name])
-        names.append(video_file.name)
+            input = torch.tensor(input, dtype=torch.float32) / 255.0  # 正規化
+            input = input.unsqueeze(0)
+            input = input.to(DEVICE)
+            with torch.no_grad():
+                _,input,_ = mvit(input)
+            input = input.squeeze(0)
+            print(input.shape)
+            inputs.append(input)
+            labels.append(label_df[video_file.name])
+            names.append(video_file.name)
 
-    # データセットとDataLoaderの作成
-    data_set = VideoDataset(inputs, labels, names, clip_length=clip_length)
-    data_set.save_to_file("/home/u01230/SoccerNarration/FEEL/dataset/video_dataset.json")
+        # データセットとDataLoaderの作成
+        data_set = VideoDataset(inputs, labels, names, clip_length=clip_length)
+        data_set.save_to_file(VIDEO_DATASET_PATH)
     return DataLoader(data_set, batch_size=batch_size, shuffle=True)
-
+    
 
 # python load_video_dataset('/home/ghoti/FEEL/FEEL/data/small_data/renamed', '/home/ghoti/FEEL/FEEL/annotation/params_test.csv', 2, 16)

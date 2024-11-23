@@ -14,7 +14,7 @@ BATCH_SIZE = 20
 CLIP_LENGTH = 16
 DIM_CHARACTERISTICS = 768
 SIZE_EPISODE = 3
-# DEVICE = torch.device("cpu") #torch.device("cuda" if torch.cuda.is_available() else "cpu")
+# DEVICE = torch.device("cpu")
 DEVICE = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 BATCH_LOG_FREQ = 10
 DEBUG = True
@@ -28,7 +28,7 @@ def eval2_to_eval1(eval2: torch.Tensor) -> torch.Tensor:
     """
     if eval2.size(1) != 8:
         raise ValueError(f"Invalid size of eval2: {eval2.size()}")
-    ret = torch.tensor(((eval2[:, 0]+eval2[:, 1])/2 - (eval2[:, 2]+eval2[:, 4]+eval2[:, 5]+eval2[:, 6])/4) * (2+eval2[:, 3]+eval2[:, 7]) / 4)
+    ret = ((eval2[:, 0]+eval2[:, 1])/2 - (eval2[:, 2]+eval2[:, 4]+eval2[:, 5]+eval2[:, 6])/4) * (2+eval2[:, 3]+eval2[:, 7]) / 4
     ret = ret.unsqueeze(1)
     return ret.to(DEVICE)
 
@@ -146,9 +146,17 @@ def train_controller_epoch(
         events = model_hippocampus.receive(characteristics, eval1)
         if len(model_hippocampus) < model_hippocampus.min_event_for_episode:
             episode = zero_padding(characteristics, (SIZE_EPISODE, eval1.shape[0], DIM_CHARACTERISTICS))
+            # FIXME: delete
+            print(episode.shape)
+            for batch in episode:
+                print(batch.shape)
             pre_eval = model_pfc(episode)
         else:
             episode = model_hippocampus.generate_episodes_batch(events=events)
+            # FIXME: delete
+            print(episode.shape)
+            for batch in episode:
+                print(batch.shape)
             pre_eval = model_pfc(episode.transpose(0, 1))
         out_eval2 = model_controller(eval1, pre_eval)
         loss = loss_fn(out_eval2, labels_eval2)
@@ -273,8 +281,8 @@ def train_models_periods (
     model_subcortical_pathway.train()
     model_controller.train()
     
-    EPOCHS = 50
-    PERIODS = 10
+    EPOCHS = 5# 50
+    PERIODS = 2 #10
     
     # First train subcortical pathway
     loss_eval1 = torch.nn.MSELoss()

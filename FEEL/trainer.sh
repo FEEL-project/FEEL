@@ -16,7 +16,7 @@ stamp=$(date +"%Y%m%d%H%M")
 # joeを使用する場合
 DATA_DIR="/home/u01231/project_body/FEEL/data/youtube_movies/joe/splitted/trainval"
 ANNOTATION_PATH="/home/u01231/project_body/FEEL/annotation/joe/params_trainval.csv"
-OUT_DIR="/home/u01231/project_body/FEEL/outs/train_$stamp"
+OUT_DIR="outs/train_$stamp"
 
 # small_dataを使用する場合
 # DATA_DIR="/home/u01231/project_body/FEEL/data/small_data/trainval"
@@ -26,7 +26,8 @@ mkdir -p $OUT_DIR
 
 # 変数を使用してコマンドを実行
 # python3 train.py --data_dir $DATA_DIR --annotation_path $ANNOTATION_PATH --out_dir $OUT_DIR > $OUT_DIR/err.out
-python3 train_merged.py --data_dir $DATA_DIR --annotation_path $ANNOTATION_PATH --out_dir $OUT_DIR > $OUT_DIR/err.out
+# python3 train_merged.py --data_dir $DATA_DIR --annotation_path $ANNOTATION_PATH --out_dir $OUT_DIR > $OUT_DIR/err.out
+# poetry run python train.py --data_dir $DATA_DIR --annotation_path $ANNOTATION_PATH --out_dir $OUT_DIR > $OUT_DIR/err.out
 
 # 使用したデータのパスなどをerr.outに書き込む
 echo "DATA_DIR: $DATA_DIR" > $OUT_DIR/err.out
