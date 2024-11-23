@@ -84,12 +84,12 @@ def csv_to_dict(file_path):
             result_dict[key] = values
     return result_dict
 
-def load_video_dataset(video_dir: str, label_path: str, batch_size: int, clip_length: int, mvit)->DataLoader:
+def load_video_dataset(video_dir: str, label_path: str, batch_size: int, clip_length: int, mvit, use_cache: bool = True, cache_path: str = None)->DataLoader:
 # 動画データセットのディレクトリ
     data_set: VideoDataset = None
-    if USE_DATASET_CACHE and os.path.exists(VIDEO_DATASET_PATH):
-        logging.info(f"Loading dataset from file {VIDEO_DATASET_PATH}")
-        data_set = VideoDataset.load_from_file(VIDEO_DATASET_PATH, clip_length)
+    if use_cache and cache_path is not None and os.path.exists(cache_path):
+        logging.info(f"Loading dataset from file {cache_path}")
+        data_set = VideoDataset.load_from_file(cache_path, clip_length)
     else:
         logging.info(f"Processing video files in {video_dir}")
         video_dir_path = Path(video_dir)
@@ -143,7 +143,8 @@ def load_video_dataset(video_dir: str, label_path: str, batch_size: int, clip_le
 
         # データセットとDataLoaderの作成
         data_set = VideoDataset(inputs, labels, names, clip_length=clip_length)
-        data_set.save_to_file(VIDEO_DATASET_PATH)
+        if cache_path is not None:
+            data_set.save_to_file(cache_path)
     return DataLoader(data_set, batch_size=batch_size, shuffle=True)
     
 
