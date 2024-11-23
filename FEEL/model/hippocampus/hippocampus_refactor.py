@@ -22,6 +22,9 @@ class Counter():
     def __next__(self) -> int:
         self.i += 1
         return self.i
+    
+def tensor_hash(tensor: torch.Tensor) -> int:
+    return hash(tensor.numpy().tobytes())
 
 class HippocampusRefactored():
     """A class representing the hippocampus of the brain
@@ -250,20 +253,28 @@ class HippocampusRefactored():
             raise ValueError("No event or characteristics was found")
         
         episode = [characteristics]
+        characteristics_set = {tensor_hash(characteristics)}
         associated_id = []
         associated_priority = []
         result_list = self.search(
-            k=self.event_per_episode-1,
+            k=min(self.event_per_episode+2, len(self)),
             characteristics=characteristics
         )
-        episode = [characteristics]
-        for result in result_list:
+        episode = []
+        for result in sorted(result_list, key=lambda x: x[0]):
+            if len(episode) >= self.event_per_episode-1:
+                break
             id, characteristics, *_, priority = self.get_event(result[0])
-            episode.append(characteristics)
+            new_hash = tensor_hash(characteristics)
+            if new_hash not in characteristics_set:
+                episode.append(characteristics)
+                characteristics_set.add(new_hash)
         for i, id in enumerate(associated_id):
             priority = associated_priority[i]
             new_priority = self.event_dataset.update_priority(id, self.priority_method[1], eval1=priority, rate=0.5)
             self.update_queue(id, new_priority)
+        # Add the original event to the last part
+        episode.append(characteristics)
         return torch.stack(episode)
     
     def generate_episodes_batch(self, event_ids: Sequence[int] = None, events: Sequence[EventData] = None, characteristics: Sequence[torch.Tensor] = None, batch_size: int = None):
