@@ -370,11 +370,13 @@ if __name__ == "__main__":
         logging.getLogger().setLevel(logging.DEBUG)
         logging.getLogger("batch").setLevel(logging.DEBUG)
         logging.getLogger("epoch").setLevel(logging.DEBUG)
+        logging.getLogger("video_dataset").setLevel(logging.DEBUG)
         
     else:
         logging.getLogger().setLevel(logging.INFO)
         logging.getLogger("batch").setLevel(logging.INFO)
         logging.getLogger("epoch").setLevel(logging.INFO)
+        logging.getLogger("video_dataset").setLevel(logging.INFO)
 
     model_mvit = EnhancedMViT(pretrained=True).to(device=DEVICE)
     # train_loader = load_video_dataset("data/small_data/trainval", "annotation/params_trainval.csv", BATCH_SIZE, CLIP_LENGTH)
