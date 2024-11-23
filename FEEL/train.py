@@ -188,15 +188,16 @@ def train_models(
     EPOCHS = 10
     
     # First train subcortical pathway
-    loss_eval1 = torch.nn.MSELoss()
-    optim_eval1 = torch.optim.Adam(model_subcortical_pathway.parameters(), lr=0.001)
-    for epoch in range(EPOCHS):
-        optim_eval1.zero_grad()
-        logging.getLogger("epoch").info(f"Epoch {epoch}/{EPOCHS}")
-        train_subcortical_pathway_epoch(data_loader, model_subcortical_pathway, loss_eval1, optim_eval1)
-        torch.save(model_subcortical_pathway.state_dict(), os.path.join(write_path, f"subcortical_pathway_{epoch}.pt"))
-        logging.getLogger("epoch").info(f"Epoch {epoch} done")
-    logging.info(f"Training Subcortical Pathway finished at {datetime.now().strftime('%Y%m%d_%H%M%S')}")
+    if subcortical_pathway_train:
+        loss_eval1 = torch.nn.MSELoss()
+        optim_eval1 = torch.optim.Adam(model_subcortical_pathway.parameters(), lr=0.001)
+        for epoch in range(EPOCHS):
+            optim_eval1.zero_grad()
+            logging.getLogger("epoch").info(f"Epoch {epoch}/{EPOCHS}")
+            train_subcortical_pathway_epoch(data_loader, model_subcortical_pathway, loss_eval1, optim_eval1)
+            torch.save(model_subcortical_pathway.state_dict(), os.path.join(write_path, f"subcortical_pathway_{epoch}.pt"))
+            logging.getLogger("epoch").info(f"Epoch {epoch} done")
+        logging.info(f"Training Subcortical Pathway finished at {datetime.now().strftime('%Y%m%d_%H%M%S')}")
     
     if not pfc_controller_train:
         return
@@ -213,13 +214,14 @@ def train_models(
         logging.getLogger("epoch").info(f"Epoch {epoch} done, hippocampus has {len(model_hippocampus)} memories")
     logging.info(f"Training PFC finished at {datetime.now().strftime('%Y%m%d_%H%M%S')}")
     
-    model_hippocampus = HippocampusRefactored(
-        DIM_CHARACTERISTICS,
-        SIZE_EPISODE,
-        replay_rate=10,
-        episode_per_replay=5,
-        min_event_for_episode=5,
-    )
+    # model_hippocampus = HippocampusRefactored(
+    #     DIM_CHARACTERISTICS,
+    #     SIZE_EPISODE,
+    #     replay_rate=10,
+    #     episode_per_replay=5,
+    #     min_event_for_episode=5,
+    # )
+    
     # Finally train controller
     model_pfc.eval()
     loss_controller = torch.nn.MSELoss()
@@ -300,13 +302,14 @@ def train_models_periods (
             logging.getLogger("epoch").info(f"Epoch {epoch} of period {period} done, hippocampus has {len(model_hippocampus)} memories")
         logging.getLogger("epoch").info(f"Period {period} done at {datetime.now().strftime('%Y%m%d_%H%M%S')}")
         
-        model_hippocampus = HippocampusRefactored(
-            DIM_CHARACTERISTICS,
-            SIZE_EPISODE,
-            replay_rate=10,
-            episode_per_replay=5,
-            min_event_for_episode=5,
-        )
+        # model_hippocampus = HippocampusRefactored(
+        #     DIM_CHARACTERISTICS,
+        #     SIZE_EPISODE,
+        #     replay_rate=10,
+        #     episode_per_replay=5,
+        #     min_event_for_episode=5,
+        # )
+        
         # Finally train controller
         model_pfc.eval()
         loss_controller = torch.nn.MSELoss()
