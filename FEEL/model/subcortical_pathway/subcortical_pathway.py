@@ -31,4 +31,3 @@ class SubcorticalPathway(nn.Module):
         # return activations
         logits = self.linear_relu_stack(x)
         return logits
-        

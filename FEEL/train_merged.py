@@ -74,7 +74,7 @@ def train_subcortical_pathway_epoch(
         optim.step()
         losses.append(loss)
         if BATCH_LOG_FREQ and i % BATCH_LOG_FREQ == 0:
-            logging.getLogger("batch").debug(f"Iteration {i}: loss {loss}")
+            logging.getLogger("batch").info(f"Iteration {i}: loss {loss}")
     logging.info(f"Average loss for epoch: {sum(losses)/len(losses)}")
 
 def train_pre_eval_epoch(
@@ -113,7 +113,7 @@ def train_pre_eval_epoch(
         optim.step()
         losses.append(loss)
         if BATCH_LOG_FREQ and i % BATCH_LOG_FREQ == 0:
-            logging.getLogger("batch").debug(f"Iteration {i}: loss {loss}")
+            logging.getLogger("batch").info(f"Iteration {i}: loss {loss}")
         if epoch==0:
             cnt = 0
             for event in events:
@@ -161,7 +161,7 @@ def train_controller_epoch(
         optim.step()
         losses.append(loss)
         if BATCH_LOG_FREQ and i % BATCH_LOG_FREQ == 0:
-            logging.getLogger("batch").debug(f"Iteration {i}: loss {loss}")
+            logging.getLogger("batch").info(f"Iteration {i}: loss {loss}")
     logging.info(f"Average loss for epoch: {sum(losses)/len(losses)}")
 
 def train_pfc_controller_epoch(
@@ -216,7 +216,7 @@ def train_pfc_controller_epoch(
         losses_2_to_label.append(loss_2_to_label)
         losses_2_to_pre.append(loss_2_to_pre)
         if BATCH_LOG_FREQ and i % BATCH_LOG_FREQ == 0:
-            logging.getLogger("batch").debug(f"Iteration {i}: loss (eval2 to eval2_label) {loss_2_to_label}, loss (eval2 to pre_eval) {loss_2_to_pre}")
+            logging.getLogger("batch").info(f"Iteration {i}: loss (eval2 to eval2_label) {loss_2_to_label}, loss (eval2 to pre_eval) {loss_2_to_pre}")
         if epoch==0:
             cnt = 0
             for event in events:
@@ -272,7 +272,7 @@ def train_pfc_controller_epoch_contrast(
         optim_controller.step()
         losses_2_to_label.append(loss_2_to_label)
         if BATCH_LOG_FREQ and i % BATCH_LOG_FREQ == 0:
-            logging.getLogger("batch").debug(f"Iteration {i}: loss (eval2 to eval2_label) {loss_2_to_label}")
+            logging.getLogger("batch").info(f"Iteration {i}: loss (eval2 to eval2_label) {loss_2_to_label}")
         if epoch==0:
             cnt = 0
             for event in events:
@@ -313,7 +313,6 @@ def train_pfc_controller_epoch_with_replay(
     losses_2_to_pre = []
     for i, data in enumerate(data_loader):
         characteristics, labels_eval2,_ = data
-        logging.debug(f"{characteristics.shape=}, {labels_eval2.shape=}")
         with torch.no_grad():
             eval1 = model_subcortical_pathway(characteristics)
         events = model_hippocampus.receive(characteristics, eval1)
@@ -324,6 +323,8 @@ def train_pfc_controller_epoch_with_replay(
             episode = model_hippocampus.generate_episodes_batch(events=events)
             pre_eval = model_pfc(episode.transpose(0, 1))
         out_eval2 = model_controller(eval1, pre_eval)
+        for i in range(len(labels_eval2)):
+            logging.debug(f"Eval2: {labels_eval2[i]}, Predicted: {out_eval2[i]}")
         loss_2_to_label = loss_maximization(out_eval2, labels_eval2)
         loss_2_to_pre = loss_expectation(pre_eval, out_eval2)
         total_loss = loss_2_to_label + loss_2_to_pre
@@ -332,8 +333,8 @@ def train_pfc_controller_epoch_with_replay(
         optim_controller.step()
         losses_2_to_label.append(loss_2_to_label)
         losses_2_to_pre.append(loss_2_to_pre)
-        if i % BATCH_LOG_FREQ == 0:
-            logging.getLogger("batch").debug(f"Iteration {i}: loss (eval2 to eval2_label) {loss_2_to_label}, loss (eval2 to pre_eval) {loss_2_to_pre}")
+        if BATCH_LOG_FREQ and i % BATCH_LOG_FREQ == 0:
+            logging.getLogger("batch").info(f"Iteration {i}: loss (eval2 to eval2_label) {loss_2_to_label}, loss (eval2 to pre_eval) {loss_2_to_pre}")
         if epoch==0:
             cnt = 0
             for event in events:
@@ -463,8 +464,8 @@ def train_models(
 if __name__ == "__main__":
     # set data-path and annotation-path
     parser = argparse.ArgumentParser(description="Train a video model")
-    parser.add_argument('--data_dir', type=str, required=True, help='Path to the dataset directory')
-    parser.add_argument('--annotation_path', type=str, required=True, help='Path to the annotation file')
+    parser.add_argument('--data_dir', type=str, required=False, help='Path to the dataset directory', default=None)
+    parser.add_argument('--annotation_path', type=str, required=False, help='Path to the annotation file', default=None)
     parser.add_argument('--out_dir', type=str, required=False, help='Path to the output directory', default=None)
     parser.add_argument('--subcortical_pathway', type=str, required=False, help='Path to the subcortical pathway model', default=None)
     parser.add_argument('--hippocampus', type=str, required=False, help='Path to the hippocampus model', default=None)
