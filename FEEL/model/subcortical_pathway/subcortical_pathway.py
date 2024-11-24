@@ -8,12 +8,12 @@ class SubcorticalPathway(nn.Module):
     def __init__(self):
         super(SubcorticalPathway, self).__init__()
         self.flatten = nn.Flatten()
-        self.linear_relu_stack = nn.Sequential(
+        self.linear_relu_stack = nn.Sequential( # geluですが...
             nn.Linear(768, 512),
-            nn.ReLU(inplace=False),
+            nn.GELU(),
             nn.Dropout(p=0.2),
             nn.Linear(512, 512),
-            nn.ReLU(inplace=False),
+            nn.GELU(),
             nn.Dropout(p=0.2),
             nn.Linear(512, 1),
             nn.Tanh()   # [-1, 1]の範囲に正規化
@@ -22,6 +22,12 @@ class SubcorticalPathway(nn.Module):
     def forward(self, x: torch.Tensor) -> torch.Tensor:
         x = x.clone()
         x = self.flatten(x)
+        # logits = self.linear_relu_stack(x)
+        # return logits
+        # activations = []
+        # for layer in self.linear_gelu_stack:
+        #     x = layer(x)
+        #     activations.append(x)
+        # return activations
         logits = self.linear_relu_stack(x)
         return logits
-        
