@@ -6,3 +6,5 @@ weights/
 *.out
 data/*.zip
 trainer.sh
+testor.sh
+testing.py
