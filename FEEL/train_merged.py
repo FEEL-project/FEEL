@@ -344,15 +344,10 @@ def train_pfc_controller_epoch_with_replay(
             optim_pfc.zero_grad()
             optim_controller.zero_grad()
             events = model_hippocampus.replay(batch_size=BATCH_SIZE)
-            logging.warning(f"{eval1.shape=}, {events.id.shape=}")
-            logging.warning(f"{len(events)=}, {events}")
             episode = model_hippocampus.generate_episodes_batch(events=events)
             eval1_replay = torch.stack([event.eval1 for event in events])  # eventsからeval1を取り出す
             labels_eval2 = torch.stack([event.eval2 for event in events])  # eventsからeval2を取り出す
-            logging.warning(f"{eval1_replay.shape=}")
-            logging.warning(f"{episode.shape=}")
             pre_eval2 = model_pfc(episode.transpose(0, 1))
-            logging.warning(f"{pre_eval2.shape=}")
             out_eval2_2 = model_controller(eval1_replay, pre_eval2)
             loss_2_to_label2 = loss_maximization(out_eval2_2, labels_eval2)
             loss_2_to_pre2 = loss_expectation(pre_eval2, out_eval2_2)

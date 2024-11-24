@@ -182,7 +182,7 @@ class EventDataset(Dataset):
         self._df["characteristics"] = self._df["characteristics"].astype(object).apply(lambda x: torch.Tensor(x).to(DEVICE))
         self._df["eval1"] = self._df["eval1"].astype(object).apply(lambda x: torch.Tensor(x).to(DEVICE))
         self._df["eval2"] = self._df["eval2"].astype(object).apply(lambda x: torch.Tensor(x).to(DEVICE))
-        self._df["priority"] = self._df["priority"].astype(object).apply(lambda x: torch.Tensor([x]).to(DEVICE))
+        self._df["priority"] = self._df["priority"].astype(object).apply(lambda x: torch.Tensor(x).to(DEVICE))
     
     @classmethod
     def load_from_file(cls, file_path: str) -> "EventDataset":
