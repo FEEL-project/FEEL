@@ -1,6 +1,6 @@
 import torch
 from torch.utils.data import Dataset
-from typing import Literal, Any, TypeVar, Tuple, Callable, List, Sequence, Iterable
+from typing import Literal, Any, TypeVar, Tuple, Callable, List, Sequence, Iterable, Union
 from dataclasses import dataclass
 import pandas as pd
 import numpy as np
@@ -12,7 +12,7 @@ DEVICE = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 class EventData:
     """A simple wrapper for data acquired by EventDataset
     """
-    id: int | torch.Tensor
+    id: Union[int,torch.Tensor]
     characteristics: torch.Tensor
     eval1: torch.Tensor
     eval2: torch.Tensor

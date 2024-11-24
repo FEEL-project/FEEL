@@ -11,13 +11,13 @@ from model import EnhancedMViT, PFC, Hippocampus, HippocampusRefactored, Subcort
 # from save_and_load import load_model, save_model
 
 BATCH_SIZE = 20
-EPOCHS = 50
 CLIP_LENGTH = 16
 DIM_CHARACTERISTICS = 768
 # DEVICE = torch.device("cpu") #torch.device("cuda" if torch.cuda.is_available() else "cpu")
 DEVICE = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 DEBUG = True
 SIZE_EPISODE = 3
+REPLAY_ITERATION = 10
 BATCH_SIZE = 20
 BATCH_LOG_FREQ = 10
 EPOCHS = 10
@@ -258,7 +258,8 @@ def train_pfc_controller_epoch_with_replay(
     for i, data in enumerate(data_loader):
         characteristics, labels_eval2,_ = data
         logging.debug(f"{characteristics.shape=}, {labels_eval2.shape=}")
-        eval1 = model_subcortical_pathway(characteristics)
+        with torch.no_grad():
+            eval1 = model_subcortical_pathway(characteristics)
         events = model_hippocampus.receive(characteristics, eval1)
         if len(model_hippocampus) < model_hippocampus.min_event_for_episode:
             episode = zero_padding(characteristics, (SIZE_EPISODE, eval1.shape[0], DIM_CHARACTERISTICS))
@@ -282,7 +283,8 @@ def train_pfc_controller_epoch_with_replay(
             for event in events:
                 model_hippocampus.save_to_memory(event=event, eval1=eval1[cnt], eval2=labels_eval2[cnt])
                 cnt += 1
-        if epoch % model_hippocampus.replay_rate == 0 and epoch > 0:
+    if epoch % model_hippocampus.replay_rate == 0 and epoch > 0:
+        for _ in range(REPLAY_ITERATION):
             optim_pfc.zero_grad()
             optim_controller.zero_grad()
             events = model_hippocampus.replay(batch_size=BATCH_SIZE)
@@ -290,9 +292,11 @@ def train_pfc_controller_epoch_with_replay(
             logging.warning(f"{len(events)=}, {events}")
             episode = model_hippocampus.generate_episodes_batch(events=events)
             eval1_replay = torch.stack([event.eval1 for event in events])  # eventsからeval1を取り出す
+            labels_eval2 = torch.stack([event.eval2 for event in events])  # eventsからeval2を取り出す
             logging.warning(f"{eval1_replay.shape=}")
             logging.warning(f"{episode.shape=}")
             pre_eval2 = model_pfc(episode.transpose(0, 1))
+            logging.warning(f"{pre_eval2.shape=}")
             out_eval2_2 = model_controller(eval1_replay, pre_eval2)
             loss_2_to_label2 = loss_maximization(out_eval2_2, labels_eval2)
             loss_2_to_pre2 = loss_expectation(pre_eval2, out_eval2_2)
@@ -300,7 +304,7 @@ def train_pfc_controller_epoch_with_replay(
             total_loss2.backward()
             optim_pfc.step()
             optim_controller.step()
-            logging.getLogger("batch").debug(f"Replay at epoch {epoch}: loss (eval2 to eval2_label) {loss_2_to_label}, loss (eval2 to pre_eval) {loss_2_to_pre}")
+        logging.getLogger("batch").debug(f"Replay at epoch {epoch}: loss (eval2 to eval2_label) {loss_2_to_label}, loss (eval2 to pre_eval) {loss_2_to_pre}")
     logging.info(f"Average loss for epoch (eval2 to eval2_label): {sum(losses_2_to_label)/len(losses_2_to_label)}")
     logging.info(f"Average loss for epoch (eval2 to pre_eval): {sum(losses_2_to_pre)/len(losses_2_to_pre)}")
 
@@ -439,12 +443,12 @@ if __name__ == "__main__":
     model_mvit = EnhancedMViT(pretrained=True).to(device=DEVICE)
     # train_loader = load_video_dataset("data/small_data/trainval", "annotation/params_trainval.csv", BATCH_SIZE, CLIP_LENGTH)
     train_loader = load_video_dataset(
-        args.data_dir,
-        args.annotation_path,
-        BATCH_SIZE,
-        CLIP_LENGTH,
-        model_mvit,
-        args.no_video_cache,
+        video_dir=args.data_dir,
+        label_path=args.annotation_path,
+        batch_size=BATCH_SIZE,
+        clip_length=CLIP_LENGTH,
+        mvit=model_mvit,
+        use_cache=args.no_video_cache,
         cache_path=args.video_cache
     )
     model_pfc = PFC(DIM_CHARACTERISTICS, SIZE_EPISODE, 8).to(device=DEVICE)
