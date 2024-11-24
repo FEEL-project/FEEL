@@ -7,7 +7,7 @@ from datetime import datetime
 
 from dataset.video_dataset import load_video_dataset
 from utils import timeit
-from model import EnhancedMViT, PFC, Hippocampus, HippocampusRefactored, SubcorticalPathway, EvalController
+from model import EnhancedMViT, PFC, Hippocampus, HippocampusRefactored, SubcorticalPathway, EvalController, event_data
 # from save_and_load import load_model, save_model
 
 BATCH_SIZE = 20
@@ -206,9 +206,11 @@ def train_pfc_controller_epoch(
             pre_eval = model_pfc(episode.transpose(0, 1))
         out_eval2 = model_controller(eval1, pre_eval)
         loss_2_to_label = loss_maximization(out_eval2, labels_eval2)
-        loss_2_to_pre = loss_expectation(pre_eval, out_eval2)
-        loss_2_to_label.backward(retain_graph=True)
-        loss_2_to_pre.backward()
+        loss_2_to_pre = loss_expectation(out_eval2, pre_eval)
+        total_loss = loss_2_to_label + loss_2_to_pre
+        total_loss.backward()
+        # loss_2_to_label.backward(retain_graph=True)
+        # loss_2_to_pre.backward(retain_graph=True)
         optim_pfc.step()
         optim_controller.step()
         losses_2_to_label.append(loss_2_to_label)
@@ -255,6 +257,7 @@ def train_pfc_controller_epoch_with_replay(
     losses_2_to_pre = []
     for i, data in enumerate(data_loader):
         characteristics, labels_eval2,_ = data
+        logging.debug(f"{characteristics.shape=}, {labels_eval2.shape=}")
         eval1 = model_subcortical_pathway(characteristics)
         events = model_hippocampus.receive(characteristics, eval1)
         if len(model_hippocampus) < model_hippocampus.min_event_for_episode:
@@ -266,8 +269,8 @@ def train_pfc_controller_epoch_with_replay(
         out_eval2 = model_controller(eval1, pre_eval)
         loss_2_to_label = loss_maximization(out_eval2, labels_eval2)
         loss_2_to_pre = loss_expectation(pre_eval, out_eval2)
-        loss_2_to_label.backward(retain_graph=True)
-        loss_2_to_pre.backward()
+        total_loss = loss_2_to_label + loss_2_to_pre
+        total_loss.backward()
         optim_pfc.step()
         optim_controller.step()
         losses_2_to_label.append(loss_2_to_label)
@@ -282,14 +285,19 @@ def train_pfc_controller_epoch_with_replay(
         if epoch % model_hippocampus.replay_rate == 0 and epoch > 0:
             optim_pfc.zero_grad()
             optim_controller.zero_grad()
-            events = model_hippocampus.replay()
+            events = model_hippocampus.replay(batch_size=BATCH_SIZE)
+            logging.warning(f"{eval1.shape=}, {events.id.shape=}")
+            logging.warning(f"{len(events)=}, {events}")
             episode = model_hippocampus.generate_episodes_batch(events=events)
-            pre_eval = model_pfc(episode.transpose(0, 1))
-            out_eval2 = model_controller(eval1, pre_eval)
-            loss_2_to_label = loss_maximization(out_eval2, labels_eval2)
-            loss_2_to_pre = loss_expectation(pre_eval, out_eval2)
-            loss_2_to_label.backward(retain_graph=True)
-            loss_2_to_pre.backward()
+            eval1_replay = torch.stack([event.eval1 for event in events])  # eventsからeval1を取り出す
+            logging.warning(f"{eval1_replay.shape=}")
+            logging.warning(f"{episode.shape=}")
+            pre_eval2 = model_pfc(episode.transpose(0, 1))
+            out_eval2_2 = model_controller(eval1_replay, pre_eval2)
+            loss_2_to_label2 = loss_maximization(out_eval2_2, labels_eval2)
+            loss_2_to_pre2 = loss_expectation(pre_eval2, out_eval2_2)
+            total_loss2 = loss_2_to_label2 + loss_2_to_pre2
+            total_loss2.backward()
             optim_pfc.step()
             optim_controller.step()
             logging.getLogger("batch").debug(f"Replay at epoch {epoch}: loss (eval2 to eval2_label) {loss_2_to_label}, loss (eval2 to pre_eval) {loss_2_to_pre}")
@@ -450,9 +458,8 @@ if __name__ == "__main__":
             DIM_CHARACTERISTICS,
             SIZE_EPISODE,
             replay_rate=EPOCHS//5,
-            episode_per_replay=5,
             min_event_for_episode=5,
-            min_event_for_replay=20
+            min_event_for_replay=20,
         )
     
     model_subcortical_pathway = SubcorticalPathway().to(device=DEVICE)
