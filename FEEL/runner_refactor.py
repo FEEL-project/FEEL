@@ -40,7 +40,6 @@ def main(video_path: str):
             # Calculates eval1 (Intuitive emotional response)
             _, characteristics, _ = model_mvit(inputs)
             eval1 = model_subcortical_pathway(characteristics) #(1)
-            logging.debug(f"characteristics: {characteristics.shape}")
             events = model_hippocampus.receive(characteristics, labels)
             for i in range(len(events)):
                 event = events[i]

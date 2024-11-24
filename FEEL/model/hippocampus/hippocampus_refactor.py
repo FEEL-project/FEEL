@@ -24,7 +24,7 @@ class Counter():
         return self.i
     
 def tensor_hash(tensor: torch.Tensor) -> int:
-    return hash(tensor.numpy().tobytes())
+    return hash(tensor.cpu().numpy().tobytes())
 
 class HippocampusRefactored():
     """A class representing the hippocampus of the brain
@@ -38,7 +38,7 @@ class HippocampusRefactored():
     # Replay
     min_event_for_replay: int
     replay_rate: int
-    episode_per_replay: int
+    sampler_samples: int
     times_replayed: int = 0
     
     # Data count
@@ -69,10 +69,10 @@ class HippocampusRefactored():
         event_per_episode: int = 3,
         min_event_for_episode: int = 8,
         replay_rate: int = 10,
-        episode_per_replay: int = 5,
+        sampler_samples: int = 100,
         min_event_for_replay: int = 100,
-        max_len_dataset: int = 1000,
-        min_event_for_loss: int = 100,
+        max_len_dataset: int = 4000,
+        min_event_for_loss: int = 4000,
         loss_freq: int = 10,
         loss_rate: float = 0.1,
         base_priority: float = 100.,
@@ -84,7 +84,7 @@ class HippocampusRefactored():
             event_per_episode (int, optional): Number of episodes in an event, or event_size. Defaults to 3.
             min_event_for_episode (int, optional): Minimum number of event to generate an episode. Defaults to 8.
             replay_rate (int, optional): Replay rate. Defaults to 10. (Note: unused)
-            episode_per_replay (int, optional): Number of episode to generate while replaying. Defaults to 5.
+            sampler_samples (int, optional): Number of episode to generate while replaying. Defaults to 5.
             min_event_for_replay (int, optional): Number of events to call replay, aka `replay_iteration`. Defaults to 100.
             max_len_dataset (int, optional): Maximum length of dataset. Defaults to 1000.
             min_event_for_loss (int, optional): Minimum number of events for memory loss to happen. Defaults to 100.
@@ -92,12 +92,12 @@ class HippocampusRefactored():
             loss_rate (float, optional): Ratio of memory to lose. Defaults to 0.1.
             base_priority (float, optional): Base priority. Defaults to 100..
         """
+        self.sampler_samples = sampler_samples
         self.dim_event = dim_event
         self.event_per_episode = event_per_episode
         self.min_event_for_episode = min_event_for_episode
         self.min_event_for_replay = min_event_for_replay
         self.replay_rate = replay_rate
-        self.episode_per_replay = episode_per_replay
         self.max_len_dataset = max_len_dataset
         self.min_event_for_loss = min_event_for_loss
         self.loss_freq = loss_freq
@@ -115,9 +115,9 @@ class HippocampusRefactored():
     def get_ids(self) -> List[int]:
         return self.event_dataset._df.index.tolist()
     
-    def init_priority(self, event_id: int, eval1: Union[torch.Tensor, float], method: Literal["base"] = "base") -> float:
+    def init_priority(self, event_id: int, eval1: Union[torch.Tensor, float], method: Literal["base"] = "base") -> torch.Tensor:
         if method == "base":
-            return (torch.abs(eval1) + self.base_priority).item()
+            return torch.abs(eval1) + self.base_priority
         else:
             raise NotImplementedError(f"Method {method} for Hippocampus.init_priority() is not defined.")
     
@@ -160,10 +160,12 @@ class HippocampusRefactored():
         """
         if len(self) < self.min_event_for_replay:
             return None
+        if batch_size >= self.sampler_samples:
+            raise ValueError(f"Batch size must be less than or equal to {self.sampler_samples}")
         if self.replay_generator is None or self.times_replayed % self.loss_freq == 0:
             # Refresh weight randomly
             weights = self.event_dataset.get_priority()
-            self.replay_generator = WeightedRandomSampler(weights, self.episode_per_replay)
+            self.replay_generator = WeightedRandomSampler(weights, num_samples=self.sampler_samples)
             self.data_loader = DataLoader(self.event_dataset, batch_size, sampler=self.replay_generator)
         return next(iter(self.data_loader))
     
@@ -209,7 +211,7 @@ class HippocampusRefactored():
             memories_removed.append(id_removed)
             self.stm.remove(id_removed)
     
-    def replay(self, batch_size: int = 1) -> EventData:
+    def replay(self, batch_size: int) -> EventData:
         """Replays memory
         1. Samples events from meory and outputs it according to the time of memory and impact
         2. Delete samples if necessary
@@ -223,6 +225,7 @@ class HippocampusRefactored():
         ids, characteristics, eval1s, eval2s, _ = events
         # Refresh priority
         for i, event_id in enumerate(ids):
+            event_id = event_id.item()
             new_priority = self.event_dataset.update_priority(event_id, self.priority_method[1], eval1=eval1s[i])
             self.times_replayed += 1
             self.update_queue(event_id, new_priority)
@@ -277,7 +280,7 @@ class HippocampusRefactored():
         episode.append(characteristics)
         return torch.stack(episode)
     
-    def generate_episodes_batch(self, event_ids: Sequence[int] = None, events: Sequence[EventData] = None, characteristics: Sequence[torch.Tensor] = None, batch_size: int = None):
+    def generate_episodes_batch(self, event_ids: Sequence[int] = None, events: Union[Sequence[EventData],EventData] = None, characteristics: Sequence[torch.Tensor] = None, batch_size: int = None):
         """Generates episodes from given ids
 
         Args:
@@ -388,7 +391,7 @@ class HippocampusRefactored():
             "min_event_for_episode": self.min_event_for_episode,
             "min_event_for_replay": self.min_event_for_replay,
             "replay_rate": self.replay_rate,
-            "episode_per_replay": self.episode_per_replay,
+            "sampler_samples": self.sampler_samples,
             "times_replayed": self.times_replayed,
             "max_len_dataset": self.max_len_dataset,
             "min_event_for_loss": self.min_event_for_loss,
@@ -424,7 +427,7 @@ class HippocampusRefactored():
         self.min_event_for_episode = dict_config["min_event_for_episode"]
         self.min_event_for_replay = dict_config["min_event_for_replay"]
         self.replay_rate = dict_config["replay_rate"]
-        self.episode_per_replay = dict_config["episode_per_replay"]
+        self.sampler_samples = dict_config["sampler_samples"]
         self.times_replayed = dict_config["times_replayed"]
         self.max_len_dataset = dict_config["max_len_dataset"]
         self.min_event_for_loss = dict_config["min_event_for_loss"]
