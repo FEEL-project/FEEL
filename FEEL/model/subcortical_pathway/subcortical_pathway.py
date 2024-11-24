@@ -11,10 +11,10 @@ class SubcorticalPathway(nn.Module):
         self.linear_relu_stack = nn.Sequential(
             nn.Linear(768, 512),
             nn.ReLU(inplace=False),
-            nn.Dropout(p=0.2),
+            nn.Dropout(p=0.3),
             nn.Linear(512, 512),
             nn.ReLU(inplace=False),
-            nn.Dropout(p=0.2),
+            nn.Dropout(p=0.3),
             nn.Linear(512, 1),
             nn.Tanh()   # [-1, 1]の範囲に正規化
         )

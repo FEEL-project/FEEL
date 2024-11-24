@@ -541,11 +541,11 @@ if __name__ == "__main__":
         model_controller.load_state_dict(torch.load(args.controller, map_location=DEVICE))
     
     train_models(
-        train_loader,
-        model_pfc,
-        model_hippocampus,
-        model_subcortical_pathway,
-        model_controller,
+        data_loader=train_loader,
+        model_pfc=model_pfc,
+        model_hippocampus=model_hippocampus,
+        model_subcortical_pathway=model_subcortical_pathway,
+        model_controller=model_controller,
         write_path=args.out_dir,
         subcortical_pathway_train=args.subcortical_pathway_train,
         pfc_controller_train=args.pfc_controller_train,
