@@ -1,10 +1,16 @@
 # FEEL project
 
+## USAGE
+
 ```sh
-cd FEEL
+python app.py
 ```
 
 ## For Developers
+
+```sh
+cd FEEL
+```
 
 We recommend that you follow the rules below.
 

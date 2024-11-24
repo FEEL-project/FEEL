@@ -149,3 +149,59 @@ def load_video_dataset(video_dir: str, label_path: str, batch_size: int, clip_le
     
 
 # python load_video_dataset('/home/ghoti/FEEL/FEEL/data/small_data/renamed', '/home/ghoti/FEEL/FEEL/annotation/params_test.csv', 2, 16)
+
+def load_video(video_path: str, clip_length: int, mvit, frame_size=(224, 224)):
+    """
+    特定の動画の特徴量を取得する関数。
+    
+    Args:
+        video_path (str): 特徴量を取得したい動画のパス
+        clip_length (int): 抽出するフレームクリップ数
+        mvit: 動画特徴量抽出モデル
+        frame_size (tuple): フレームのリサイズサイズ (デフォルト: (224, 224))
+    
+    Returns:
+        torch.Tensor: 動画の特徴量テンソル
+    """
+    if not os.path.exists(video_path):
+        raise FileNotFoundError(f"Video file {video_path} does not exist.")
+
+    # OpenCVで動画ファイルを開く
+    cap = cv2.VideoCapture(video_path)
+    # 動画の全フレーム数を取得
+    frame_count = int(cap.get(cv2.CAP_PROP_FRAME_COUNT))
+    # 動画の全フレーム数からclip_lengthの数だけ均等なインデックスを取得
+    indices = np.linspace(1, frame_count, num=clip_length, dtype=int)
+
+    input_frames = []
+    count = 1
+    while True:
+        # フレームを順番に取得
+        ret, frame = cap.read()
+        # 正しく取得できればretにTrueが返される
+        if ret:
+            # 均等に取得したindicesリスト内のインデックスのときだけフレームを保存
+            if count in indices:
+                # フレームをリサイズ
+                frame = cv2.resize(frame, frame_size)
+                input_frames.append(frame)
+        else:
+            break
+        count += 1
+
+    cap.release()
+
+    # 取得したフレームのリストをテンソルに変換し、[T, C, H, W] に整形
+    input_frames = np.array(input_frames)  # [T, H, W, C]
+    input_frames = np.transpose(input_frames, (3, 0, 1, 2))  # [C, T, H, W]
+
+    input_tensor = torch.tensor(input_frames, dtype=torch.float32) / 255.0  # 正規化
+    input_tensor = input_tensor.unsqueeze(0)
+    input_tensor = input_tensor.to(DEVICE)
+
+    # 動画特徴量をモデルで抽出
+    with torch.no_grad():
+        _, features, _ = mvit(input_tensor)
+
+    print(features.shape)
+    return features

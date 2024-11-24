@@ -1,0 +1,57 @@
+.container {
+  display: grid;
+  grid-template-columns: 1fr 1fr; /* 2列に分ける */
+  gap: 20px; /* 2つの要素間に隙間を設定 */
+  height: 75vh;
+  width: 90vw;
+  margin: 0 auto; /* 水平方向に中央揃え */
+}
+
+.video-container, .chart-container {
+  width: 100%;
+}
+
+video {
+  width: 100%;
+}
+
+canvas {
+  width: 100%;
+}
+
+/* ボタンを中央に寄せるためのスタイル */
+.button-container {
+  display: flex;
+  justify-content: center;  /* 水平方向に中央揃え */
+  align-items: center;      /* 垂直方向に中央揃え */
+  height: 15vh;            /* 親要素の高さを画面いっぱいに設定 */
+  position: relative;       /* 相対位置を設定 */
+}
+
+.big-button {
+  font-size: 24px;          /* フォントサイズを大きく */
+  padding: 15px 30px;       /* パディングでボタンの大きさを調整 */
+  background-color: #007BFF; /* ボタンの背景色 */
+  color: white;             /* ボタンの文字色 */
+  border: none;             /* ボーダーをなくす */
+  border-radius: 8px;       /* 角を丸くする */
+  cursor: pointer;          /* ポインタを指に変更 */
+}
+
+.big-button:hover {
+  background-color: #0056b3; /* ホバー時に背景色を変更 */
+}
+
+.right-button {
+  position: absolute;       /* 絶対位置を設定 */
+  right: 0;                 /* 右端に配置 */
+}
+
+
+#chart-container {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  text-align: center;
+  font-size: 30px;
+}
