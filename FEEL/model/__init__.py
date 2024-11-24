@@ -9,5 +9,6 @@ from .amygdala import Amygdala
 from .prefrontal_cortex import PFC
 from .elaborator import Elaborator
 from .subcortical_pathway import SubcorticalPathway
+from .hippocampus import event_data
 
-__all__ = ['ECO_Lite', 'Full_ECO', 'EnhancedMViT', 'Hippocampus', 'HippocampusRefactored', 'VectorDatabase', 'EventDataset', 'Episode', 'SubcorticalPathway','EvalController', 'Amygdala', 'PFC']
+__all__ = ['ECO_Lite', 'Full_ECO', 'EnhancedMViT', 'Hippocampus', 'HippocampusRefactored', 'VectorDatabase', 'EventDataset', 'Episode', 'SubcorticalPathway','EvalController', 'Amygdala', 'PFC', 'event_data']
