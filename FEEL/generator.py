@@ -16,14 +16,21 @@ DIM_CHARACTERISTICS = 768
 SIZE_EPISODE = 5
 DEVICE = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
-DDHHMM = 242354 # 250233
-NN = 24
+DDHHMM = 250841 # 242354# 250233
+NN = 2
+
+# model_paths = {
+#     "subcortical_pathway": f"/home/u01231/project_body/FEEL/outs/train_202411{DDHHMM}/subcortical_pathway_{NN}.pt",
+#     "pfc": f"/home/u01231/project_body/FEEL/outs/train_202411{DDHHMM}/pfc_{NN}.pt",
+#     "hippocampus": f"/home/u01231/project_body/FEEL/outs/train_202411{DDHHMM}/hippocampus_{NN}",
+#     "controller": f"/home/u01231/project_body/FEEL/outs/train_202411{DDHHMM}/controller_{NN}.pt"
+# }
 
 model_paths = {
-    "subcortical_pathway": f"/home/u01231/project_body/FEEL/outs/train_202411{DDHHMM}/subcortical_pathway_{NN}.pt",
-    "pfc": f"/home/u01231/project_body/FEEL/outs/train_202411{DDHHMM}/pfc_{NN}.pt",
-    "hippocampus": f"/home/u01231/project_body/FEEL/outs/train_202411{DDHHMM}/hippocampus_{NN}",
-    "controller": f"/home/u01231/project_body/FEEL/outs/train_202411{DDHHMM}/controller_{NN}.pt"
+    "subcortical_pathway": f"/home/u01230/SoccerNarration/FEEL/outs/train_202411{DDHHMM}/subcortical_pathway_{NN}.pt",
+    "pfc": f"/home/u01230/SoccerNarration/FEEL/outs/train_202411{DDHHMM}/pfc_{NN}.pt",
+    "hippocampus": f"/home/u01230/SoccerNarration/FEEL/outs/train_202411{DDHHMM}/hippocampus_{NN}",
+    "controller": f"/home/u01230/SoccerNarration/FEEL/outs/train_202411{DDHHMM}/controller_{NN}.pt"
 }
 
 def zero_padding(data: torch.Tensor, size:tuple) -> torch.Tensor:
