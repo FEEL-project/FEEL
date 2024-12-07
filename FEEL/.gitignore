@@ -7,5 +7,3 @@ weights/
 data/*.zip
 trainer.sh
 testor.sh
-testing.py
-tester.sh

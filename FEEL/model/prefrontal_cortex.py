@@ -66,6 +66,7 @@ class PFC(nn.Module):
             d_model=d_model,
             nhead=nhead,
             dim_feedforward=dim_feedforward,
+            activation=torch.nn.functional.gelu
         )
         self.encoder = nn.TransformerEncoder(encoder_layer, num_encoder_layers)
         

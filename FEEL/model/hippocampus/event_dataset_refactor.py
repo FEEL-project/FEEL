@@ -7,7 +7,7 @@ import numpy as np
 from functools import wraps
 
 T = TypeVar("T")
-DEVICE = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+
 @dataclass
 class EventData:
     """A simple wrapper for data acquired by EventDataset
@@ -69,7 +69,7 @@ class EventDataset(Dataset):
     _df: pd.DataFrame
     
     def __init__(
-        self
+        self,
     ):
         self._df = pd.DataFrame(
             data=[],
@@ -178,21 +178,25 @@ class EventDataset(Dataset):
                 raise TypeError(f"Unsupported parsing type {type(input)}")
         self._df.to_json(file_path, default_handler=handler)
     
-    def _cast_type(self) -> None:
-        self._df["characteristics"] = self._df["characteristics"].astype(object).apply(lambda x: torch.Tensor(x).to(DEVICE))
-        self._df["eval1"] = self._df["eval1"].astype(object).apply(lambda x: torch.Tensor(x).to(DEVICE))
-        self._df["eval2"] = self._df["eval2"].astype(object).apply(lambda x: torch.Tensor(x).to(DEVICE))
-        self._df["priority"] = self._df["priority"].astype(object).apply(lambda x: torch.Tensor(x).to(DEVICE))
+    def _cast_type(self, device: torch.device = None) -> None:
+        def apply_fn(x: torch.Tensor|list) -> torch.Tensor:
+            if device is not None:
+                return torch.Tensor(x).to(device)
+            return torch.Tensor(x)
+        self._df["characteristics"] = self._df["characteristics"].astype(object).apply(apply_fn)
+        self._df["eval1"] = self._df["eval1"].astype(object).apply(apply_fn)
+        self._df["eval2"] = self._df["eval2"].astype(object).apply(apply_fn)
+        self._df["priority"] = self._df["priority"].astype(object).apply(apply_fn)
     
     @classmethod
-    def load_from_file(cls, file_path: str) -> "EventDataset":
+    def load_from_file(cls, file_path: str, device: torch.device) -> "EventDataset":
         """Load EventDataset from file_path
 
         Args:
             file_path (str): File path to load
+            device (torch.device): Device to load data to
         """
         self = cls()
         self._df = pd.read_json(file_path)
-        self._cast_type()
-        print(self)
+        self._cast_type(device)
         return self
