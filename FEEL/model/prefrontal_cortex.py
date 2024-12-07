@@ -70,7 +70,11 @@ class PFC(nn.Module):
         )
         self.encoder = nn.TransformerEncoder(encoder_layer, num_encoder_layers)
         
-        self.classifier = nn.Linear(d_model, dim_out)
+        # self.classifier = nn.Linear(d_model, dim_out)
+        self.classifier =nn.Sequential(
+            nn.Linear(d_model, dim_out),
+            nn.Sigmoid()
+        )
     
     def forward(self, src: torch.Tensor) -> torch.Tensor:
         """forward

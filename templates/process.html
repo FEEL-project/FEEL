@@ -1,0 +1,52 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Processing</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+    <script>
+        async function generateEmotion() {
+            const video = "{{ video }}";
+            document.getElementById("chart-container").innerHTML = "Generating chart...";
+            try {
+                const response = await fetch("/generate_chart", {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({ video }),
+                });
+                const data = await response.json();
+                if (data.chart_url) {
+                    document.getElementById("chart-container").innerHTML = `
+                        <img src="${data.chart_url}" alt="Radar Chart">
+                    `;
+                } else {
+                    document.getElementById("chart-container").innerHTML = "Error generating chart.";
+                }
+            } catch (error) {
+                document.getElementById("chart-container").innerHTML = "An error occurred.";
+            }
+        }
+    </script>
+</head>
+<body>
+    <h1>FEEL (Feedforward Emotion ELaborator)</h1>
+    <div class="container">
+        <div class="video-container">
+            <h2>Video</h2>
+            <video controls width="600">
+                <source src="{{ url_for('uploaded_file', filename=video) }}" type="video/mp4">
+                Your browser does not support the video tag.
+            </video>
+        </div>
+        <div id="chart-container">
+            <canvas id="radar-chart"></canvas>
+        </div>
+    </div>
+    <div class="button-container">
+        <button class="big-button" onclick="generateEmotion()">Generate Emotions</button>
+        <a href="/" class="big-button right-button">Select Another Video</a>
+    </div>
+    
+</body>
+</html>

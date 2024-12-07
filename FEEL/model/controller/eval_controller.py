@@ -20,6 +20,13 @@ class EvalController(nn.Module):
             nn.GELU(),
             nn.Linear(512, out_dim)
         )
+        # self.linear_stack = nn.Sequential(
+        #     nn.Linear(in_dim, 512),
+        #     nn.GELU(),
+        #     nn.Linear(512, 512),
+        #     nn.GELU(),
+        #     nn.Linear(512, out_dim)
+        # )
     
     def forward(self, primary: torch.Tensor, pref_cortex: torch.Tensor) -> torch.Tensor:
         """
