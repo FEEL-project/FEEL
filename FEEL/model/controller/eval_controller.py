@@ -15,9 +15,9 @@ class EvalController(nn.Module):
         self.out_dim = out_dim
         self.linear_stack = nn.Sequential(
             nn.Linear(in_dim, 512),
-            nn.ReLU(),
+            nn.GELU(),
             nn.Linear(512, 512),
-            nn.ReLU(),
+            nn.GELU(),
             nn.Linear(512, out_dim)
         )
     

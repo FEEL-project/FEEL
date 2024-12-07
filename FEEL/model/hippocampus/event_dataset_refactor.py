@@ -194,5 +194,4 @@ class EventDataset(Dataset):
         self = cls()
         self._df = pd.read_json(file_path)
         self._cast_type()
-        print(self)
         return self
