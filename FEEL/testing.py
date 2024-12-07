@@ -144,7 +144,7 @@ if __name__=="__main__":
         filemode='w'
     )
     index_epoch = args.epoch
-    print(f"Saving to path {args.write_path}")
+    
     logging.info(f"Start testing with the following parameters: {args}")
     
     data_loader = load_video_dataset(
@@ -158,7 +158,7 @@ if __name__=="__main__":
     
     model_pfc = PFC(DIM_CHARACTERISTICS, SIZE_EPISODE).to(DEVICE)
     model_pfc.load_state_dict(torch.load(os.path.join(args.model_path, f"pfc_{index_epoch}.pt"), map_location=DEVICE))
-    model_hippocampus = HippocampusRefactored.load_from_file(os.path.join(args.model_path, f"hippocampus_{index_epoch}"))
+    model_hippocampus = HippocampusRefactored.load_from_file(os.path.join(args.model_path, f"hippocampus_{index_epoch}"), DEVICE)
     model_subcortical_pathway = SubcorticalPathway().to(DEVICE)
     model_subcortical_pathway.load_state_dict(torch.load(os.path.join(args.model_path, f"subcortical_pathway_{index_epoch}.pt"), map_location=DEVICE))
     model_controller = EvalController().to(DEVICE)

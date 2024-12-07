@@ -407,7 +407,7 @@ class HippocampusRefactored():
             json.dump(dict_config, f)
     
     @classmethod
-    def load_from_file(cls, file_path: str) -> "HippocampusRefactored":
+    def load_from_file(cls, file_path: str, device: torch.device) -> "HippocampusRefactored":
         """Loads and structures Hippocampus from file
 
         Args:
@@ -437,7 +437,7 @@ class HippocampusRefactored():
         self.base_priority = dict_config["base_priority"]
         self.priority_method = dict_config["priority_method"]
         self.id_generator = Counter(dict_config["counter_current"])
-        self.event_dataset = EventDataset.load_from_file(path_dataset)
+        self.event_dataset = EventDataset.load_from_file(path_dataset, device)
         self.stm = VectorDatabase(self.dim_event)
         self.priority_queue = PriorityQueue()
         for i in range(len(self.event_dataset)):

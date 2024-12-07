@@ -1,3 +1,5 @@
+## WARNING: DEPRECATED
+
 import torch
 from torch.utils.data import DataLoader
 import logging
@@ -6,7 +8,7 @@ import argparse
 from datetime import datetime
 
 from dataset.video_dataset import load_video_dataset
-from utils import timeit
+from utils import zero_padding, eval2_to_eval1
 from model import EnhancedMViT, PFC, Hippocampus, HippocampusRefactored, SubcorticalPathway, EvalController, event_data
 # from save_and_load import load_model, save_model
 
@@ -464,54 +466,40 @@ def train_models(
 if __name__ == "__main__":
     # set data-path and annotation-path
     parser = argparse.ArgumentParser(description="Train a video model")
-    parser.add_argument('--data_dir', type=str, required=False, help='Path to the dataset directory', default=None)
-    parser.add_argument('--annotation_path', type=str, required=False, help='Path to the annotation file', default=None)
-    parser.add_argument('--out_dir', type=str, required=False, help='Path to the output directory', default=None)
-    parser.add_argument('--subcortical_pathway', type=str, required=False, help='Path to the subcortical pathway model', default=None)
+    parser.add_argument('--data', "-d", type=str, required=False, help='Path to the dataset directory', default=None)
+    parser.add_argument('--annotation', "-a", type=str, required=False, help='Path to the annotation file', default=None)
+    parser.add_argument('--out', "-o", type=str, required=False, help='Path to the output directory', default="./outs/")
+    parser.add_argument('--epoch', "-e", type=int, required=False, help='Number of epochs to run', default=20)
+    parser.add_argument('--batch-size', "-b", type=int, required=False, help='Batch size', default=20)
+    parser.add_argument('--subcortical-pathway', type=str, required=False, help='Path to the subcortical pathway model', default=None)
     parser.add_argument('--hippocampus', type=str, required=False, help='Path to the hippocampus model', default=None)
     parser.add_argument('--pfc', type=str, required=False, help='Path to the prefrontal cortex model', default=None)
     parser.add_argument('--controller', type=str, required=False, help='Path to the controller model', default=None)
-    parser.add_argument('--subcortical_pathway_train', type=bool, required=False, help='Train the subcortical pathway', default=True)
-    parser.add_argument('--pfc_controller_train', type=bool, required=False, help='Train the PFC and controller', default=True)
+    parser.add_argument('--subcortical-pathway-train', type=bool, required=False, help='Train the subcortical pathway', default=True)
+    parser.add_argument('--pfc-controller-train', type=bool, required=False, help='Train the PFC and controller', default=True)
     parser.add_argument('--replay', type=bool, required=False, help='Use replay in hippocampus', default=False)
+    parser.add_argument("--debug", action="store_true", help="Enable debug logging")
     parser.add_argument('--contrast', type=bool, required=False, help='Use contrastive learning', default=False)
-    parser.add_argument('--no-debug', action='store_false', help='Enable debug logging')
-    parser.add_argument('--no-video-cache', action='store_false', help='Disable video cache')
-    parser.add_argument('--log-frequency', type=int, required=False, help='Log frequency', default=10)
-    parser.add_argument('--batch-size', type=int, required=False, help='Batch size', default=20)
-    parser.add_argument('--epoch', type=int, required=False, help='Number of epochs to run', default=20)
-    parser.add_argument('--episode-size', type=int, required=False, help='Number of epochs to run', default=3)
+    parser.add_argument('--episode-size', type=int, required=False, help='Number of events an episode contains', default=3)
     parser.add_argument('--video-cache', type=str, required=False, help='Video cache', default=None)
     
     # 引数を解析
     args = parser.parse_args()
-    DEBUG = args.no_debug
     BATCH_LOG_FREQ = args.log_frequency
     BATCH_SIZE = args.batch_size
     EPOCHS = args.epoch
     SIZE_EPISODE = args.episode_size
     
+    if not os.path.exists(args.out):
+        os.makedirs(args.out)
+    
     timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
-    logging.basicConfig(level=logging.WARNING, 
-                        format='{asctime} [{levelname:.4}] {name}: {message}', 
-                        style='{', 
-                        filename=args.out_dir + f"/train_{timestamp}.log",
-                        filemode='w')
-    if DEBUG:
-        logging.getLogger().setLevel(logging.DEBUG)
-        logging.getLogger("batch").setLevel(logging.DEBUG)
-        logging.getLogger("epoch").setLevel(logging.DEBUG)
-        
-    else:
-        logging.getLogger().setLevel(logging.INFO)
-        logging.getLogger("batch").setLevel(logging.INFO)
-        logging.getLogger("epoch").setLevel(logging.INFO)
 
     model_mvit = EnhancedMViT(pretrained=True).to(device=DEVICE)
     # train_loader = load_video_dataset("data/small_data/trainval", "annotation/params_trainval.csv", BATCH_SIZE, CLIP_LENGTH)
     train_loader = load_video_dataset(
-        video_dir=args.data_dir,
-        label_path=args.annotation_path,
+        video_dir=args.data,
+        label_path=args.annotation,
         batch_size=BATCH_SIZE,
         clip_length=CLIP_LENGTH,
         mvit=model_mvit,

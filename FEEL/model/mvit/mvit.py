@@ -4,7 +4,7 @@ from torchvision.models.video import mvit_v1_b, MViT_V1_B_Weights
 from typing import Tuple
 
 # from dataset.video_dataset import load_video_dataset # trainer.sh, testor.sh の実行時用
-from ...dataset.video_dataset import load_video_dataset # python app.py の実行時用
+from dataset.video_dataset import load_video_dataset # python app.py の実行時用
 
 def _unsqueeze(x: torch.Tensor, target_dim: int, expand_dim: int) -> Tuple[torch.Tensor, int]:
     tensor_dim = x.dim()
